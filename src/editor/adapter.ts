@@ -103,6 +103,8 @@ function styleOf(element: El | undefined) {
 }
 
 const EDGE_LABEL_SIZE = 16;
+// The corner style the engine gives shapes drawn by hand: adaptive radius for rectangles, proportional for diamonds.
+const NODE_ROUNDNESS: Partial<Record<NodeKind, {type: 2 | 3}>> = {rectangle: {type: 3}, diamond: {type: 2}};
 
 function build(skeleton: ExcalidrawElementSkeleton): Mutable<El>[] {
   return convertToExcalidrawElements([skeleton], {regenerateIds: false}) as Mutable<El>[];
@@ -173,6 +175,7 @@ export function applyDiagram(elements: readonly El[], before: Diagram, after: Di
       put(
         build({
           ...fresh,
+          ...(existing ? {} : {roundness: NODE_ROUNDNESS[node.kind] ?? null}),
           ...styleOf(existing),
           type: node.kind as "rectangle",
           id: node.id,
