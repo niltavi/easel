@@ -89,6 +89,7 @@ Available ops:
 Layout:
 - The canvas also holds handwritten strokes that you cannot see, so change only what the instruction asks for and do not move unrelated nodes just to tidy things up.
 - Place a new node near the nodes it relates to, keep a gap of at least 60 pixels from surrounding nodes, and do not overlap existing nodes.
+- Leave at least 120 pixels between two nodes joined by an edge that has a label, so the label does not cover the line.
 - On a blank canvas start near (0, 0), lay the main flow out top to bottom, and spread branches out to the left and right.
 - Typical sizes: rectangle about 160×64, diamond about 180×100, ellipse about 140×60. Widen the node when the label is long.
 - Keep the text inside nodes short, and use the same language as the user's instruction.
@@ -178,8 +179,8 @@ export const mockProvider: AiProvider = async (prompt, diagram) => {
     return [
       {op: "add_node", node: {id: "start", kind: "ellipse", x: 20, y: 0, width: 140, height: 60, text: label("Submit request", "提交申请")}},
       {op: "add_node", node: {id: "review", kind: "diamond", x: 0, y: 130, width: 180, height: 100, text: label("Review", "审批")}},
-      {op: "add_node", node: {id: "done", kind: "rectangle", x: 10, y: 300, width: 160, height: 64, text: label("Archive", "归档")}},
-      {op: "add_node", node: {id: "reject", kind: "rectangle", x: 260, y: 148, width: 160, height: 64, text: label("Send back", "退回修改")}},
+      {op: "add_node", node: {id: "done", kind: "rectangle", x: 10, y: 350, width: 160, height: 64, text: label("Archive", "归档")}},
+      {op: "add_node", node: {id: "reject", kind: "rectangle", x: 320, y: 148, width: 160, height: 64, text: label("Send back", "退回修改")}},
       {op: "add_edge", edge: {id: "e1", kind: "arrow", from: "start", to: "review", text: ""}},
       {op: "add_edge", edge: {id: "e2", kind: "arrow", from: "review", to: "done", text: label("approve", "通过")}},
       {op: "add_edge", edge: {id: "e3", kind: "arrow", from: "review", to: "reject", text: label("reject", "驳回")}},

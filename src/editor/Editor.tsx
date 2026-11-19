@@ -348,7 +348,7 @@ export function Editor({workId, nonce, theme, onUi, ref}: Props) {
         if (!api || previewRef.current) return;
         const state = api.getAppState();
         const original = api.getSceneElementsIncludingDeleted();
-        const patch = applyDiagram(original, before, after, {strokeColor: state.currentItemStrokeColor});
+        const patch = applyDiagram(original, before, after, {strokeColor: state.currentItemStrokeColor, strokeWidth: canvasWidth(level.current, "rectangle")});
         previewRef.current = {original, view: {scrollX: state.scrollX, scrollY: state.scrollY, zoom: state.zoom}, patch};
         api.updateScene({
           elements: patch.preview,
