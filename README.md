@@ -4,7 +4,7 @@
 
 # Easel
 
-*Pick up the pen. The rest can wait.*
+*An offline-first whiteboard for one person.*
 
 [简体中文](docs/zh-CN/README.md)
 
@@ -12,15 +12,11 @@
 
 ---
 
-You open a whiteboard to catch an idea, and it asks you to sign in, choose a workspace, and wait for the network. By the time the canvas is ready, half the thought is gone.
+Easel puts handwriting, text, shapes, and connectors on one infinite canvas. Drag from the edge of a shape to connect it to another. Number keys switch tools.
 
-Easel opens on the canvas. Handwriting, text, shapes, and connectors share one infinite page. Hover over a shape and drag from its edge to connect it to another; press a number key to change tools.
+Drawings are saved on the device, and the app works offline once installed. Sync is off by default. After signing in with an email code, you turn it on for the drawings you want on other devices.
 
-Everything is saved on your device and keeps working offline, installed as an app on a phone, tablet, or desktop. Turn on sync for the drawings you want on your other devices. The rest never leave. When two devices change the same drawing, Easel keeps both versions.
-
-When a diagram is quicker to describe than to draw, ask AI. It proposes changes to the flowchart, you look at the preview, then apply or discard it.
-
-It runs on your own machine: one Node process and one SQLite file.
+AI can draw a flowchart from a description or edit the one on the canvas. It shows the change as a preview, which you apply or discard.
 
 <br />
 
