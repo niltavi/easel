@@ -31,8 +31,14 @@ function activeSession(): Session | null {
 
 export const requestCode = (email: string) => api.requestCode(email);
 
-export async function verifyCode(email: string, code: string) {
-  const {token, user} = await api.verifyCode(email, code);
+/** How the server signs people in. An unreachable server is treated as the default, an emailed code. */
+export const authMode = () => api.authConfig().then((config) => config.signIn, () => "code" as const);
+
+export const verifyCode = async (email: string, code: string) => adopt(await api.verifyCode(email, code));
+export const register = async (email: string, password: string) => adopt(await api.register(email, password));
+export const signInWithPassword = async (email: string, password: string) => adopt(await api.login(email, password));
+
+async function adopt({token, user}: {token: string; user: Session["user"]}) {
   const previous = getState().session;
   const session: Session = {token, user, expired: false};
   await store.kvSet(SESSION, session);

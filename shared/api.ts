@@ -6,6 +6,11 @@ export interface User {
   email: string;
 }
 
+/** How this server signs people in: an emailed code (the default), or email and password on a self-hosted server. */
+export interface AuthConfig {
+  signIn: "code" | "password";
+}
+
 export interface RemoteWorkInfo {
   id: string;
   name: string;
@@ -53,6 +58,8 @@ export type ErrorCode =
   | "unauthorized"
   | "rate_limited"
   | "invalid_code"
+  | "invalid_credentials"
+  | "email_taken"
   | "not_found"
   | "conflict"
   | "gone"

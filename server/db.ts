@@ -41,5 +41,9 @@ export function openDatabase(path: string): DatabaseSync {
       PRIMARY KEY (user_id, day)
     );
   `);
+  // Columns added after the first release. Accounts that existed before were all created by verifying an email code.
+  const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as {name: string}[]).map((column) => column.name));
+  if (!columns.has("password_hash")) db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
+  if (!columns.has("email_verified")) db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1");
   return db;
 }

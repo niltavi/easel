@@ -2,7 +2,7 @@ import {Button, Description, FieldError, Form, Input, InputOTP, Label, Modal, Te
 import {useEffect, useState} from "react";
 import {ApiError} from "../lib/api.ts";
 import {t} from "../lib/i18n.ts";
-import {requestCode, verifyCode} from "../lib/sync.ts";
+import {authMode, register, requestCode, signInWithPassword, verifyCode} from "../lib/sync.ts";
 
 interface Props {
   isOpen: boolean;
@@ -21,6 +21,10 @@ function describe(error: unknown): string {
 }
 
 export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onSignedIn}: Props) {
+  // "code" is the default flow; a self-hosted server reports "password" and the dialog switches to it.
+  const [mode, setMode] = useState<"code" | "password">("code");
+  const [creating, setCreating] = useState(false);
+  const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState(defaultEmail);
   const [code, setCode] = useState("");
@@ -34,6 +38,13 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
     setEmail(defaultEmail);
     setCode("");
     setError("");
+    setPassword("");
+    setCreating(false);
+    let current = true;
+    void authMode().then((value) => current && setMode(value));
+    return () => {
+      current = false;
+    };
   }, [isOpen, defaultEmail]);
 
   useEffect(() => {
@@ -61,6 +72,26 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
     }
   };
 
+  // A field marked invalid blocks the form from being submitted again, so editing clears the last error.
+  const edit = (set: (value: string) => void) => (value: string) => {
+    set(value);
+    setError("");
+  };
+
+  const submitPassword = async () => {
+    setPending(true);
+    setError("");
+    try {
+      await (creating ? register : signInWithPassword)(email.trim(), password);
+      onOpenChange(false);
+      onSignedIn();
+    } catch (cause) {
+      setError(describe(cause));
+    } finally {
+      setPending(false);
+    }
+  };
+
   const verify = async (value: string) => {
     setPending(true);
     setError("");
@@ -82,13 +113,45 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
         <Modal.Dialog className="sm:max-w-sm">
           <Modal.CloseTrigger />
           <Modal.Header>
-            <Modal.Heading>{step === "email" ? t("auth.title") : t("auth.codeTitle")}</Modal.Heading>
+            <Modal.Heading>
+              {mode === "password" ? (creating ? t("auth.registerTitle") : t("auth.title")) : step === "email" ? t("auth.title") : t("auth.codeTitle")}
+            </Modal.Heading>
             <p className="mt-1.5 text-sm leading-6 text-muted">
-              {step === "email" ? (reason ?? t("auth.intro")) : t("auth.codeSent", {email: email.trim()})}
+              {mode === "password"
+                ? creating
+                  ? t("auth.introRegister")
+                  : (reason ?? t("auth.introPassword"))
+                : step === "email"
+                  ? (reason ?? t("auth.intro"))
+                  : t("auth.codeSent", {email: email.trim()})}
             </p>
           </Modal.Header>
           <Modal.Body>
-            {step === "email" ? (
+            {mode === "password" ? (
+              <Form
+                className="flex flex-col gap-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitPassword();
+                }}
+              >
+                <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
+                  <Label>{t("auth.email")}</Label>
+                  <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
+                </TextField>
+                <TextField isRequired name="password" type="password" value={password} onChange={edit(setPassword)} isInvalid={error !== ""} minLength={creating ? 8 : undefined} maxLength={128}>
+                  <Label>{t("auth.password")}</Label>
+                  <Input autoComplete={creating ? "new-password" : "current-password"} />
+                  {error ? <FieldError>{error}</FieldError> : creating ? <Description>{t("auth.passwordHint")}</Description> : null}
+                </TextField>
+                <Button type="submit" variant="primary" isPending={pending} className="w-full">
+                  {creating ? t("auth.createAccount") : t("common.signIn")}
+                </Button>
+                <Button size="sm" variant="ghost" className="self-start -ms-2.5" onPress={() => { setCreating(!creating); setError(""); }}>
+                  {creating ? t("auth.toSignIn") : t("auth.toRegister")}
+                </Button>
+              </Form>
+            ) : step === "email" ? (
               <Form
                 className="flex flex-col gap-4"
                 onSubmit={(event) => {
@@ -96,7 +159,7 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                   void send();
                 }}
               >
-                <TextField isRequired name="email" type="email" value={email} onChange={setEmail} isInvalid={error !== ""} autoFocus>
+                <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} isInvalid={error !== ""} autoFocus>
                   <Label>{t("auth.email")}</Label>
                   <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
                   {error ? <FieldError>{error}</FieldError> : null}

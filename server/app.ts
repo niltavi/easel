@@ -1,8 +1,8 @@
-import {createHash, randomBytes, randomInt, randomUUID, timingSafeEqual} from "node:crypto";
+import {createHash, randomBytes, randomInt, randomUUID, scrypt, timingSafeEqual} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import {Hono, type Context} from "hono";
 import {bodyLimit} from "hono/body-limit";
-import type {ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../shared/api.ts";
+import type {AuthConfig, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../shared/api.ts";
 import {MAX_AI_OBJECTS, MAX_PROMPT_LENGTH, parseDiagram, validateOps} from "../shared/diagram.ts";
 import {AiError, type AiProvider} from "./ai.ts";
 import type {Mailer} from "./mail.ts";
@@ -15,6 +15,11 @@ export interface AppOptions {
   ai: AiProvider | null;
   /** Number of valid previews per account per day; adjustable on the server. */
   dailyQuota: number;
+  /**
+   * Self-hosted mode: people register and sign in with an email and a password, and no email is ever sent.
+   * Off by default, where signing in requires a code emailed to the address.
+   */
+  selfHosted?: boolean;
   aiTimeoutMs?: number;
   now?: () => number;
 }
@@ -22,6 +27,10 @@ export interface AppOptions {
 const CODE_TTL = 10 * 60_000;
 const CODE_RESEND_INTERVAL = 60_000;
 const CODE_MAX_ATTEMPTS = 5;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
+const LOGIN_MAX_FAILURES = 5;
+const LOGIN_LOCK = 15 * 60_000;
 const SESSION_TTL = 30 * 24 * 3600_000;
 const MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
 const DAY = 24 * 3600_000;
@@ -31,9 +40,28 @@ const isEmail = (value: unknown): value is string =>
   typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isWorkId = (value: string) => /^[\w-]{8,64}$/.test(value);
 
+const isPassword = (value: unknown): value is string => typeof value === "string" && value.length >= PASSWORD_MIN && value.length <= PASSWORD_MAX;
+
+const derive = (password: string, salt: Buffer) =>
+  new Promise<Buffer>((resolve, reject) => scrypt(password, salt, 64, (error, key) => (error ? reject(error) : resolve(key))));
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  return `scrypt:${salt.toString("base64url")}:${(await derive(password, salt)).toString("base64url")}`;
+}
+
+async function checkPassword(password: string, stored: string | null): Promise<boolean> {
+  const [scheme, salt, hash] = (stored ?? "").split(":");
+  // Derive a key even when there is nothing to compare with, so a missing account takes as long as a wrong password.
+  const key = await derive(password, salt ? Buffer.from(salt, "base64url") : Buffer.alloc(16));
+  if (scheme !== "scrypt" || !hash) return false;
+  const expected = Buffer.from(hash, "base64url");
+  return expected.length === key.length && timingSafeEqual(expected, key);
+}
+
 type Env = {Variables: {user: User}};
 
-export function createApp({db, mailer, ai, dailyQuota, aiTimeoutMs = 60_000, now = Date.now}: AppOptions) {
+export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTimeoutMs = 60_000, now = Date.now}: AppOptions) {
   const app = new Hono<Env>().basePath("/api");
   const fail = (c: Context, status: 400 | 401 | 404 | 409 | 410 | 413 | 429 | 500 | 502 | 503 | 504, error: ErrorCode, key: MessageKey, extra: object = {}, params: Record<string, string | number> = {}) =>
     c.json({error, message: message(langOf(c.req.header("accept-language")), key, params), ...extra}, status);
@@ -53,9 +81,58 @@ export function createApp({db, mailer, ai, dailyQuota, aiTimeoutMs = 60_000, now
     }
   };
 
+  const startSession = (c: Context, user: User) => {
+    const token = randomBytes(32).toString("base64url");
+    db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(sha256(token), user.id, now() + SESSION_TTL);
+    return c.json({token, user: {id: user.id, email: user.email}});
+  };
+
+  app.get("/auth/config", (c) => c.json({signIn: selfHosted ? "password" : "code"} satisfies AuthConfig));
+
+  // ---------- Sign-in on a self-hosted server: email and password, no email is sent ----------
+
+  // Failed sign-ins per email, kept in memory; enough to slow down guessing against one account.
+  const failures = new Map<string, {count: number; until: number}>();
+
+  app.post("/auth/register", async (c) => {
+    if (!selfHosted) return fail(c, 404, "not_found", "endpointNotFound");
+    const body = await readJson(c);
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
+    if (!isEmail(email)) return fail(c, 400, "bad_request", "invalidEmail");
+    if (!isPassword(body?.password)) return fail(c, 400, "bad_request", "passwordRule");
+    // An address that already has an account is never taken over, including one created by an emailed code.
+    if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) return fail(c, 409, "email_taken", "emailTaken");
+    const user: User = {id: randomUUID(), email};
+    // Nothing proved that the address belongs to this person, so it is recorded as unverified.
+    db.prepare("INSERT INTO users (id, email, created_at, password_hash, email_verified) VALUES (?, ?, ?, ?, 0)").run(
+      user.id, email, now(), await hashPassword(body.password));
+    return startSession(c, user);
+  });
+
+  app.post("/auth/login", async (c) => {
+    if (!selfHosted) return fail(c, 404, "not_found", "endpointNotFound");
+    const body = await readJson(c);
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body?.password === "string" ? body.password.slice(0, PASSWORD_MAX) : "";
+    const failed = failures.get(email);
+    if (failed && failed.count >= LOGIN_MAX_FAILURES && failed.until > now()) return fail(c, 429, "rate_limited", "tooManyAttempts");
+    const row = db.prepare("SELECT id, email, password_hash FROM users WHERE email = ?").get(email) as
+      | {id: string; email: string; password_hash: string | null}
+      | undefined;
+    if (!(await checkPassword(password, row?.password_hash ?? null)) || !row) {
+      const count = failed && failed.until > now() ? failed.count + 1 : 1;
+      failures.set(email, {count, until: now() + LOGIN_LOCK});
+      return fail(c, 401, "invalid_credentials", "invalidCredentials");
+    }
+    failures.delete(email);
+    return startSession(c, {id: row.id, email: row.email});
+  });
+
   // ---------- Sign-in: email verification code ----------
 
   app.post("/auth/request", async (c) => {
+    // A self-hosted server sends no email, so there is no code to request or verify.
+    if (selfHosted) return fail(c, 404, "not_found", "endpointNotFound");
     const body = await readJson(c);
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
     if (!isEmail(email)) return fail(c, 400, "bad_request", "invalidEmail");
@@ -79,6 +156,7 @@ export function createApp({db, mailer, ai, dailyQuota, aiTimeoutMs = 60_000, now
   });
 
   app.post("/auth/verify", async (c) => {
+    if (selfHosted) return fail(c, 404, "not_found", "endpointNotFound");
     const body = await readJson(c);
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
     const code = typeof body?.code === "string" ? body.code.trim() : "";
@@ -98,11 +176,9 @@ export function createApp({db, mailer, ai, dailyQuota, aiTimeoutMs = 60_000, now
     let user = db.prepare("SELECT id, email FROM users WHERE email = ?").get(email) as User | undefined;
     if (!user) {
       user = {id: randomUUID(), email};
-      db.prepare("INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)").run(user.id, email, now());
-    }
-    const token = randomBytes(32).toString("base64url");
-    db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(sha256(token), user.id, now() + SESSION_TTL);
-    return c.json({token, user: {id: user.id, email: user.email}});
+      db.prepare("INSERT INTO users (id, email, created_at, email_verified) VALUES (?, ?, ?, 1)").run(user.id, email, now());
+    } else db.prepare("UPDATE users SET email_verified = 1 WHERE id = ?").run(user.id);
+    return startSession(c, user);
   });
 
   // ---------- All endpoints below require sign-in ----------
