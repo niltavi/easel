@@ -4,6 +4,7 @@ import type {PushConflict, RemoteWorkInfo} from "../../shared/api.ts";
 import {api, ApiError} from "./api.ts";
 import * as store from "./db.ts";
 import {EaselFileError, parseDocument, serializeDocument} from "./file.ts";
+import {t} from "./i18n.ts";
 import {editor, getState, notify, setState, ui} from "./state.ts";
 import type {Session, WorkMeta} from "./types.ts";
 import {ensureCurrent, newId, openLocalWork, pendingDeletes, refreshWorks, setPendingDeletes} from "./works.ts";
@@ -59,10 +60,10 @@ async function expireSession() {
   setState({session: expired, quota: null});
   notify({
     kind: "warning",
-    title: "登录已过期",
-    description: "改动会继续保存在这台设备上，重新登录后再同步。",
+    title: t("session.expired"),
+    description: t("session.expiredBody"),
     sticky: true,
-    action: {label: "重新登录", run: () => ui.openAuth()},
+    action: {label: t("common.signInAgain"), run: () => ui.openAuth()},
   });
 }
 
@@ -185,7 +186,7 @@ async function detachFromCloud(id: string) {
   if (!work?.cloud) return;
   const scene = await store.getScene(id);
   if (work.cloud.downloaded && work.cloud.dirty && scene) {
-    const copy: WorkMeta = {...work, id: newId(), name: `${work.name}（本机副本）`, cloud: null};
+    const copy: WorkMeta = {...work, id: newId(), name: t("name.localCopy", {name: work.name}), cloud: null};
     await store.writeBatch([{put: copy, scene}, {remove: id}]);
     if (getState().currentId === id) {
       await store.kvSet("lastOpened", copy.id);
@@ -193,14 +194,14 @@ async function detachFromCloud(id: string) {
     }
     notify({
       kind: "warning",
-      title: `「${work.name}」的云端副本已移除`,
-      description: "这台设备上还没上传的改动保存为本机副本。",
+      title: t("sync.cloudRemovedTitle", {name: work.name}),
+      description: t("sync.cloudRemovedBody"),
       sticky: true,
     });
   } else {
     await store.deleteWork(id);
     if (getState().currentId === id) {
-      notify({kind: "info", title: `「${work.name}」已在其他设备删除或关闭同步`});
+      notify({kind: "info", title: t("sync.removedElsewhere", {name: work.name})});
     }
   }
 }
@@ -247,7 +248,7 @@ async function pushOne(session: Session, id: string, rebased = false): Promise<v
     } else if (error.code === "gone" || error.code === "not_found") {
       await detachFromCloud(id);
     } else if (error.code === "too_large") {
-      notify({kind: "warning", title: `「${work.name}」太大，暂时无法同步`, description: "作品仍保存在这台设备上。"});
+      notify({kind: "warning", title: t("sync.tooLargeTitle", {name: work.name}), description: t("sync.tooLargeBody")});
     } else {
       throw error;
     }
@@ -263,7 +264,7 @@ async function keepConflictCopy(session: Session, id: string) {
   const scene = await store.getScene(id);
   if (!work?.cloud?.dirty || !scene) return;
   const now = Date.now();
-  const copy: WorkMeta = {...work, id: newId(), name: `${work.name}（冲突副本）`, cloud: null, createdAt: now, updatedAt: now, openedAt: now - 1};
+  const copy: WorkMeta = {...work, id: newId(), name: t("name.conflictCopy", {name: work.name}), cloud: null, createdAt: now, updatedAt: now, openedAt: now - 1};
   await store.writeBatch([
     {put: copy, scene},
     {put: {...work, cloud: {...work.cloud, dirty: false, downloaded: false}}, scene: "delete"},
@@ -276,10 +277,10 @@ async function keepConflictCopy(session: Session, id: string) {
   }
   notify({
     kind: "warning",
-    title: `「${work.name}」在另一台设备上有更新`,
-    description: `这台设备上的改动保存在「${copy.name}」，两份内容都在作品列表里。`,
+    title: t("sync.conflictTitle", {name: work.name}),
+    description: t("sync.conflictBody", {copy: copy.name}),
     sticky: true,
-    action: {label: "打开副本", run: () => void openLocalWork(copy.id)},
+    action: {label: t("sync.openCopy"), run: () => void openLocalWork(copy.id)},
   });
 }
 
@@ -291,7 +292,7 @@ async function download(session: Session, id: string): Promise<boolean> {
     parsed = parseDocument(remote.snapshot);
   } catch (error) {
     if (!(error instanceof EaselFileError)) throw error;
-    notify({kind: "warning", title: `「${remote.name}」无法在这个版本的 Easel 中打开`, description: error.message});
+    notify({kind: "warning", title: t("sync.unsupported", {name: remote.name}), description: error.message});
     return false;
   }
   // The canvas may still hold a few unpersisted strokes: write them down first. That makes the work "pending", so the code below won't overwrite it.
@@ -324,7 +325,7 @@ export async function openWork(id: string): Promise<boolean> {
   if (work.cloud && !work.cloud.downloaded) {
     const session = activeSession();
     if (!session || !getState().online) {
-      notify({kind: "info", title: "这件作品还没有下载到这台设备", description: session || !getState().session ? "联网后再打开，下载完成即可离线编辑。" : "重新登录后即可下载。"});
+      notify({kind: "info", title: t("sync.notDownloadedTitle"), description: session || !getState().session ? t("sync.notDownloadedOffline") : t("sync.notDownloadedSignIn")});
       return false;
     }
     try {
@@ -334,8 +335,8 @@ export async function openWork(id: string): Promise<boolean> {
       else if (error instanceof ApiError && (error.code === "not_found" || error.code === "gone")) {
         await detachFromCloud(id);
         await refreshWorks();
-        notify({kind: "info", title: "这件作品已在其他设备删除或关闭同步"});
-      } else notify({kind: "warning", title: "下载没有完成", description: "请检查网络后再试。"});
+        notify({kind: "info", title: t("sync.currentRemovedElsewhere")});
+      } else notify({kind: "warning", title: t("sync.downloadFailed"), description: t("error.checkNetwork")});
       return false;
     }
     await refreshWorks();
@@ -359,7 +360,7 @@ export async function disableSync(id: string): Promise<boolean> {
   const work = await store.getWork(id);
   if (!work?.cloud) return true;
   if (!session || !getState().online) {
-    notify({kind: "info", title: "关闭同步需要联网", description: "联网并登录后再试，作品会保留在这台设备上。"});
+    notify({kind: "info", title: t("sync.offNeedsOnlineTitle"), description: t("sync.offNeedsOnlineBody")});
     return false;
   }
   await running;
@@ -371,7 +372,7 @@ export async function disableSync(id: string): Promise<boolean> {
       return false;
     }
     if (!(error instanceof ApiError) || (error.code !== "not_found" && error.code !== "gone")) {
-      notify({kind: "warning", title: "没能关闭同步", description: "请检查网络后再试。"});
+      notify({kind: "warning", title: t("sync.offFailed"), description: t("error.checkNetwork")});
       return false;
     }
   }

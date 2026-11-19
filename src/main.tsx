@@ -4,8 +4,10 @@ import {registerSW} from "virtual:pwa-register";
 import "@fontsource-variable/dm-sans";
 import "./index.css";
 import {App} from "./components/App.tsx";
+import {locale} from "./lib/i18n.ts";
 
 registerSW({immediate: true});
+document.documentElement.lang = locale;
 
 // A two-finger trackpad pinch arrives in the browser as Ctrl+wheel. The canvas handles zoom itself;
 // intercept it when the pointer is over the toolbar or sidebar, so the whole page doesn't get zoomed.

@@ -1,12 +1,16 @@
 // Lets the model propose a restricted set of add, update and delete ops on the diagram. The output is validated by shared/diagram.ts before it is returned to the browser.
 import Anthropic from "@anthropic-ai/sdk";
 import type {Diagram} from "../shared/diagram.ts";
+import type {MessageKey} from "./messages.ts";
 
 export class AiError extends Error {
   readonly code: "ai_unavailable" | "ai_invalid_output" | "ai_timeout";
-  constructor(code: "ai_unavailable" | "ai_invalid_output" | "ai_timeout", message: string) {
-    super(message);
+  /** The user-facing message, as a key into server/messages.ts. */
+  readonly key: MessageKey;
+  constructor(code: "ai_unavailable" | "ai_invalid_output" | "ai_timeout", key: MessageKey) {
+    super(key);
     this.code = code;
+    this.key = key;
   }
 }
 
@@ -93,7 +97,7 @@ Ops are executed in order. If the instruction has nothing to do with the flowcha
 
 function normalize(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null || !Array.isArray((raw as {ops?: unknown}).ops)) {
-    throw new AiError("ai_invalid_output", "AI 返回的内容无法识别");
+    throw new AiError("ai_invalid_output", "aiUnrecognized");
   }
   return (raw as {ops: Array<Record<string, unknown>>}).ops.map((item) => {
     const entries = Object.entries(item).filter(([, value]) => value !== null);
@@ -136,29 +140,29 @@ export function createClaudeProvider(env: NodeJS.ProcessEnv): AiProvider {
         {signal, maxRetries: 1},
       );
     } catch (error) {
-      if (signal.aborted) throw new AiError("ai_timeout", "AI 响应超时");
+      if (signal.aborted) throw new AiError("ai_timeout", "aiTimeout");
       if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
         console.error("[easel] invalid AI credentials", error.message);
-        throw new AiError("ai_unavailable", "AI 暂时不可用");
+        throw new AiError("ai_unavailable", "aiUnavailable");
       }
       if (error instanceof Anthropic.RateLimitError || error instanceof Anthropic.InternalServerError) {
-        throw new AiError("ai_unavailable", "AI 正忙，请稍后再试");
+        throw new AiError("ai_unavailable", "aiBusy");
       }
-      if (error instanceof Anthropic.APIConnectionError) throw new AiError("ai_unavailable", "AI 暂时不可用");
+      if (error instanceof Anthropic.APIConnectionError) throw new AiError("ai_unavailable", "aiUnavailable");
       if (error instanceof Anthropic.APIError) {
         console.error("[easel] AI request failed", error.status, error.message);
-        throw new AiError("ai_unavailable", "AI 暂时不可用");
+        throw new AiError("ai_unavailable", "aiUnavailable");
       }
       throw error;
     }
-    if (response.stop_reason === "refusal") throw new AiError("ai_invalid_output", "AI 无法处理这条指令");
-    if (response.stop_reason === "max_tokens") throw new AiError("ai_invalid_output", "这次改动太大，试着分几步描述");
+    if (response.stop_reason === "refusal") throw new AiError("ai_invalid_output", "aiRefused");
+    if (response.stop_reason === "max_tokens") throw new AiError("ai_invalid_output", "aiTooBig");
     const text = response.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
-      throw new AiError("ai_invalid_output", "AI 返回的内容无法识别");
+      throw new AiError("ai_invalid_output", "aiUnrecognized");
     }
     return normalize(parsed);
   };
@@ -167,21 +171,24 @@ export function createClaudeProvider(env: NodeJS.ProcessEnv): AiProvider {
 /** Demo implementation used when there are no model credentials; only enabled when EASEL_AI_MOCK=1 is set explicitly. */
 export const mockProvider: AiProvider = async (prompt, diagram) => {
   await new Promise((resolve) => setTimeout(resolve, 600));
+  // Label the sample in the language of the instruction, as the real model is asked to.
+  const zh = /\p{Script=Han}/u.test(prompt);
+  const label = (en: string, han: string) => (zh ? han : en);
   if (diagram.nodes.length === 0) {
     return [
-      {op: "add_node", node: {id: "start", kind: "ellipse", x: 20, y: 0, width: 140, height: 60, text: "提交申请"}},
-      {op: "add_node", node: {id: "review", kind: "diamond", x: 0, y: 130, width: 180, height: 100, text: "审批"}},
-      {op: "add_node", node: {id: "done", kind: "rectangle", x: 10, y: 300, width: 160, height: 64, text: "归档"}},
-      {op: "add_node", node: {id: "reject", kind: "rectangle", x: 260, y: 148, width: 160, height: 64, text: "退回修改"}},
+      {op: "add_node", node: {id: "start", kind: "ellipse", x: 20, y: 0, width: 140, height: 60, text: label("Submit request", "提交申请")}},
+      {op: "add_node", node: {id: "review", kind: "diamond", x: 0, y: 130, width: 180, height: 100, text: label("Review", "审批")}},
+      {op: "add_node", node: {id: "done", kind: "rectangle", x: 10, y: 300, width: 160, height: 64, text: label("Archive", "归档")}},
+      {op: "add_node", node: {id: "reject", kind: "rectangle", x: 260, y: 148, width: 160, height: 64, text: label("Send back", "退回修改")}},
       {op: "add_edge", edge: {id: "e1", kind: "arrow", from: "start", to: "review", text: ""}},
-      {op: "add_edge", edge: {id: "e2", kind: "arrow", from: "review", to: "done", text: "通过"}},
-      {op: "add_edge", edge: {id: "e3", kind: "arrow", from: "review", to: "reject", text: "驳回"}},
+      {op: "add_edge", edge: {id: "e2", kind: "arrow", from: "review", to: "done", text: label("approve", "通过")}},
+      {op: "add_edge", edge: {id: "e3", kind: "arrow", from: "review", to: "reject", text: label("reject", "驳回")}},
     ];
   }
   const anchor = diagram.nodes[0];
   const id = `n${Date.now().toString(36)}`;
   return [
-    {op: "update_node", id: anchor.id, text: `${anchor.text || "步骤"}*`},
+    {op: "update_node", id: anchor.id, text: `${anchor.text || label("Step", "步骤")}*`},
     {op: "add_node", node: {id, kind: "rectangle", x: anchor.x + anchor.width + 100, y: anchor.y, width: 160, height: 64, text: prompt.slice(0, 12)}},
     {op: "add_edge", edge: {id: `e${id}`, kind: "arrow", from: anchor.id, to: id, text: ""}},
     ...(diagram.edges.length > 1 ? [{op: "delete", id: diagram.edges[diagram.edges.length - 1].id}] : []),

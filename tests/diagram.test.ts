@@ -3,8 +3,8 @@ import {parseDiagram, validateOps, type Diagram} from "../shared/diagram.ts";
 
 const diagram: Diagram = {
   nodes: [
-    {id: "a", kind: "rectangle", x: 0, y: 0, width: 160, height: 64, text: "提交"},
-    {id: "b", kind: "diamond", x: 0, y: 140, width: 180, height: 100, text: "审批"},
+    {id: "a", kind: "rectangle", x: 0, y: 0, width: 160, height: 64, text: "Submit"},
+    {id: "b", kind: "diamond", x: 0, y: 140, width: 180, height: 100, text: "Review"},
   ],
   edges: [{id: "e1", kind: "arrow", from: "a", to: "b", text: ""}],
 };
@@ -12,15 +12,15 @@ const diagram: Diagram = {
 describe("validateOps", () => {
   it("accepts adds, updates and deletes, and returns a summary", () => {
     const result = validateOps(diagram, [
-      {op: "add_node", node: {id: "c", kind: "rectangle", x: 260, y: 150, width: 160, height: 64, text: "驳回"}},
-      {op: "add_edge", edge: {id: "e2", kind: "arrow", from: "b", to: "c", text: "驳回"}},
-      {op: "update_node", id: "a", text: "提交申请"},
+      {op: "add_node", node: {id: "c", kind: "rectangle", x: 260, y: 150, width: 160, height: 64, text: "Reject"}},
+      {op: "add_edge", edge: {id: "e2", kind: "arrow", from: "b", to: "c", text: "Reject"}},
+      {op: "update_node", id: "a", text: "Submit request"},
       {op: "delete", id: "e1"},
     ]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.summary).toEqual({added: 2, updated: 1, deleted: 1});
-    expect(result.result.nodes.find((n) => n.id === "a")?.text).toBe("提交申请");
+    expect(result.result.nodes.find((n) => n.id === "a")?.text).toBe("Submit request");
   });
 
   it("deleting a node also deletes the edges bound to it", () => {

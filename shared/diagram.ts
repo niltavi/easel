@@ -72,29 +72,29 @@ function onlyKeys(value: Record<string, unknown>, allowed: string[]): boolean {
  * The returned ops contain only whitelisted fields and can be handed straight to the canvas adapter layer.
  */
 export function validateOps(diagram: Diagram, raw: unknown): ValidationResult {
-  if (!Array.isArray(raw)) return {ok: false, error: "操作列表格式不正确"};
-  if (raw.length === 0) return {ok: false, error: "没有可应用的改动"};
-  if (raw.length > MAX_OPS) return {ok: false, error: "改动数量超出上限"};
+  if (!Array.isArray(raw)) return {ok: false, error: "the ops list is malformed"};
+  if (raw.length === 0) return {ok: false, error: "there are no changes to apply"};
+  if (raw.length > MAX_OPS) return {ok: false, error: "too many ops"};
 
   const nodes = new Map(diagram.nodes.map((n) => [n.id, {...n}]));
   const edges = new Map(diagram.edges.map((e) => [e.id, {...e}]));
   const touched = {added: new Set<string>(), updated: new Set<string>(), deleted: new Set<string>()};
   const ops: DiagramOp[] = [];
-  const fail = (index: number, reason: string): ValidationResult => ({ok: false, error: `第 ${index + 1} 条改动无效：${reason}`});
+  const fail = (index: number, reason: string): ValidationResult => ({ok: false, error: `op ${index + 1} is invalid: ${reason}`});
 
   for (let i = 0; i < raw.length; i++) {
     const item = raw[i];
-    if (!isRecord(item)) return fail(i, "不是对象");
+    if (!isRecord(item)) return fail(i, "not an object");
     switch (item.op) {
       case "add_node": {
         const n = item.node;
-        if (!onlyKeys(item, ["op", "node"]) || !isRecord(n)) return fail(i, "缺少节点");
-        if (!onlyKeys(n, ["id", "kind", "x", "y", "width", "height", "text"])) return fail(i, "含有不支持的属性");
-        if (!isId(n.id) || nodes.has(n.id) || edges.has(n.id)) return fail(i, "节点 id 无效或重复");
-        if (!NODE_KINDS.includes(n.kind as NodeKind)) return fail(i, "不支持的节点类型");
-        if (!isCoord(n.x) || !isCoord(n.y) || !isSize(n.width) || !isSize(n.height)) return fail(i, "位置或尺寸无效");
-        if (!isText(n.text)) return fail(i, "文字无效");
-        if (n.kind === "text" && n.text.trim() === "") return fail(i, "文字节点不能为空");
+        if (!onlyKeys(item, ["op", "node"]) || !isRecord(n)) return fail(i, "missing node");
+        if (!onlyKeys(n, ["id", "kind", "x", "y", "width", "height", "text"])) return fail(i, "unsupported property");
+        if (!isId(n.id) || nodes.has(n.id) || edges.has(n.id)) return fail(i, "invalid or duplicate node id");
+        if (!NODE_KINDS.includes(n.kind as NodeKind)) return fail(i, "unsupported node kind");
+        if (!isCoord(n.x) || !isCoord(n.y) || !isSize(n.width) || !isSize(n.height)) return fail(i, "invalid position or size");
+        if (!isText(n.text)) return fail(i, "invalid text");
+        if (n.kind === "text" && n.text.trim() === "") return fail(i, "a text node cannot be empty");
         const node: DiagramNode = {id: n.id, kind: n.kind as NodeKind, x: n.x, y: n.y, width: n.width, height: n.height, text: n.text};
         nodes.set(node.id, node);
         touched.added.add(node.id);
@@ -102,40 +102,40 @@ export function validateOps(diagram: Diagram, raw: unknown): ValidationResult {
         break;
       }
       case "update_node": {
-        if (!onlyKeys(item, ["op", "id", "text", "x", "y", "width", "height"])) return fail(i, "含有不支持的属性");
-        if (!isId(item.id) || !nodes.has(item.id)) return fail(i, "找不到要修改的节点");
+        if (!onlyKeys(item, ["op", "id", "text", "x", "y", "width", "height"])) return fail(i, "unsupported property");
+        if (!isId(item.id) || !nodes.has(item.id)) return fail(i, "node to update not found");
         const node = nodes.get(item.id)!;
         const op: DiagramOp = {op: "update_node", id: item.id};
         if (item.text !== undefined) {
-          if (!isText(item.text)) return fail(i, "文字无效");
-          if (node.kind === "text" && item.text.trim() === "") return fail(i, "文字节点不能为空");
+          if (!isText(item.text)) return fail(i, "invalid text");
+          if (node.kind === "text" && item.text.trim() === "") return fail(i, "a text node cannot be empty");
           node.text = op.text = item.text;
         }
         for (const key of ["x", "y"] as const) {
           if (item[key] === undefined) continue;
-          if (!isCoord(item[key])) return fail(i, "位置无效");
+          if (!isCoord(item[key])) return fail(i, "invalid position");
           node[key] = op[key] = item[key] as number;
         }
         for (const key of ["width", "height"] as const) {
           if (item[key] === undefined) continue;
-          if (!isSize(item[key])) return fail(i, "尺寸无效");
+          if (!isSize(item[key])) return fail(i, "invalid size");
           node[key] = op[key] = item[key] as number;
         }
-        if (Object.keys(op).length === 2) return fail(i, "没有要修改的内容");
+        if (Object.keys(op).length === 2) return fail(i, "nothing to change");
         if (!touched.added.has(node.id)) touched.updated.add(node.id);
         ops.push(op);
         break;
       }
       case "add_edge": {
         const e = item.edge;
-        if (!onlyKeys(item, ["op", "edge"]) || !isRecord(e)) return fail(i, "缺少连线");
-        if (!onlyKeys(e, ["id", "kind", "from", "to", "text"])) return fail(i, "含有不支持的属性");
-        if (!isId(e.id) || nodes.has(e.id) || edges.has(e.id)) return fail(i, "连线 id 无效或重复");
-        if (!EDGE_KINDS.includes(e.kind as EdgeKind)) return fail(i, "不支持的连线类型");
-        if (!isId(e.from) || !isId(e.to) || !nodes.has(e.from) || !nodes.has(e.to)) return fail(i, "连线两端必须是已有节点");
-        if (e.from === e.to) return fail(i, "连线不能连接同一个节点");
+        if (!onlyKeys(item, ["op", "edge"]) || !isRecord(e)) return fail(i, "missing edge");
+        if (!onlyKeys(e, ["id", "kind", "from", "to", "text"])) return fail(i, "unsupported property");
+        if (!isId(e.id) || nodes.has(e.id) || edges.has(e.id)) return fail(i, "invalid or duplicate edge id");
+        if (!EDGE_KINDS.includes(e.kind as EdgeKind)) return fail(i, "unsupported edge kind");
+        if (!isId(e.from) || !isId(e.to) || !nodes.has(e.from) || !nodes.has(e.to)) return fail(i, "both ends of an edge must be existing nodes");
+        if (e.from === e.to) return fail(i, "an edge cannot connect a node to itself");
         const text = e.text === undefined ? "" : e.text;
-        if (!isText(text)) return fail(i, "文字无效");
+        if (!isText(text)) return fail(i, "invalid text");
         const edge = {id: e.id, kind: e.kind as EdgeKind, from: e.from, to: e.to, text};
         edges.set(edge.id, edge);
         touched.added.add(edge.id);
@@ -143,28 +143,28 @@ export function validateOps(diagram: Diagram, raw: unknown): ValidationResult {
         break;
       }
       case "update_edge": {
-        if (!onlyKeys(item, ["op", "id", "text", "from", "to"])) return fail(i, "含有不支持的属性");
-        if (!isId(item.id) || !edges.has(item.id)) return fail(i, "找不到要修改的连线");
+        if (!onlyKeys(item, ["op", "id", "text", "from", "to"])) return fail(i, "unsupported property");
+        if (!isId(item.id) || !edges.has(item.id)) return fail(i, "edge to update not found");
         const edge = edges.get(item.id)!;
         const op: DiagramOp = {op: "update_edge", id: item.id};
         if (item.text !== undefined) {
-          if (!isText(item.text)) return fail(i, "文字无效");
+          if (!isText(item.text)) return fail(i, "invalid text");
           edge.text = op.text = item.text;
         }
         for (const key of ["from", "to"] as const) {
           if (item[key] === undefined) continue;
           const target = item[key];
-          if (!isId(target) || !nodes.has(target)) return fail(i, "连线端点必须是已有节点");
+          if (!isId(target) || !nodes.has(target)) return fail(i, "an edge endpoint must be an existing node");
           edge[key] = op[key] = target;
         }
-        if (edge.from !== null && edge.from === edge.to) return fail(i, "连线不能连接同一个节点");
-        if (Object.keys(op).length === 2) return fail(i, "没有要修改的内容");
+        if (edge.from !== null && edge.from === edge.to) return fail(i, "an edge cannot connect a node to itself");
+        if (Object.keys(op).length === 2) return fail(i, "nothing to change");
         if (!touched.added.has(edge.id)) touched.updated.add(edge.id);
         ops.push(op);
         break;
       }
       case "delete": {
-        if (!onlyKeys(item, ["op", "id"]) || !isId(item.id)) return fail(i, "缺少 id");
+        if (!onlyKeys(item, ["op", "id"]) || !isId(item.id)) return fail(i, "missing id");
         const id = item.id;
         if (nodes.has(id)) {
           nodes.delete(id);
@@ -178,20 +178,20 @@ export function validateOps(diagram: Diagram, raw: unknown): ValidationResult {
         } else if (edges.has(id)) {
           edges.delete(id);
         } else {
-          return fail(i, "找不到要删除的对象");
+          return fail(i, "object to delete not found");
         }
         markDeleted(touched, id);
         ops.push({op: "delete", id});
         break;
       }
       default:
-        return fail(i, "不支持的操作");
+        return fail(i, "unsupported op");
     }
   }
 
   const result: Diagram = {nodes: [...nodes.values()], edges: [...edges.values()]};
   const summary = {added: touched.added.size, updated: touched.updated.size, deleted: touched.deleted.size};
-  if (summary.added + summary.updated + summary.deleted === 0) return {ok: false, error: "没有可应用的改动"};
+  if (summary.added + summary.updated + summary.deleted === 0) return {ok: false, error: "there are no changes to apply"};
   return {ok: true, ops, result, summary};
 }
 

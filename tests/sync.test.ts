@@ -140,13 +140,13 @@ describe("cloud sync", () => {
     await syncNow();
 
     const works = visibleWorks();
-    const copies = works.filter((w) => w.name.includes("冲突副本"));
+    const copies = works.filter((w) => w.name.includes("conflict copy"));
     expect(copies).toHaveLength(1);
     expect((await store.getScene(copies[0].id))?.elements).toEqual(sceneWith("mine").elements);
     expect((await store.getScene(id))?.elements).toEqual(sceneWith("theirs").elements);
     expect(workStatus(works.find((w) => w.id === id)!)).toBe("synced");
     expect((await other.get(id)).version).toBe(2);
-    expect(notices.some((n) => n.title.includes("另一台设备"))).toBe(true);
+    expect(notices.some((n) => n.title.includes("updated on another device"))).toBe(true);
   });
 
   it("commit succeeded but the response was lost: retrying creates neither a new version nor a copy", async () => {
@@ -170,7 +170,7 @@ describe("cloud sync", () => {
     vi.stubGlobal("fetch", realFetch);
     await syncNow();
 
-    expect(visibleWorks().filter((w) => w.name.includes("副本"))).toEqual([]);
+    expect(visibleWorks().filter((w) => w.name.includes("copy"))).toEqual([]);
     const other = await otherDevice("a@example.com");
     const remote = await other.get(id);
     expect(remote.version).toBe(3);
@@ -194,7 +194,7 @@ describe("cloud sync", () => {
 
     const works = visibleWorks();
     expect(works.find((w) => w.id === id)).toBeUndefined();
-    const kept = works.find((w) => w.name.includes("本机副本"))!;
+    const kept = works.find((w) => w.name.includes("local copy"))!;
     expect(workStatus(kept)).toBe("local");
     expect((await store.getScene(kept.id))?.elements).toEqual(sceneWith("offline-edit").elements);
     expect(getState().currentId).toBe(kept.id);

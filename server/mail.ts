@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
+import {message, type Lang} from "./messages.ts";
 
-export type Mailer = (email: string, code: string) => Promise<void>;
+export type Mailer = (email: string, code: string, lang: Lang) => Promise<void>;
 
 /** Sends email when SMTP is configured; otherwise prints the verification code to the server log, for convenient local development. */
 export function createMailer(env: NodeJS.ProcessEnv): Mailer {
@@ -12,12 +13,12 @@ export function createMailer(env: NodeJS.ProcessEnv): Mailer {
   }
   const transport = nodemailer.createTransport(url);
   const from = env.EASEL_MAIL_FROM ?? "Easel <no-reply@localhost>";
-  return async (email, code) => {
+  return async (email, code, lang) => {
     await transport.sendMail({
       from,
       to: email,
-      subject: `${code} 是你的 Easel 登录验证码`,
-      text: `你的 Easel 登录验证码是 ${code}，10 分钟内有效。\n\n如果这不是你本人的操作，忽略这封邮件即可。`,
+      subject: message(lang, "mailSubject", {code}),
+      text: message(lang, "mailBody", {code}),
     });
   };
 }

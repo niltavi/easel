@@ -1,6 +1,7 @@
 import {Button, Description, FieldError, Form, Input, InputOTP, Label, Modal, TextField} from "@heroui/react";
 import {useEffect, useState} from "react";
 import {ApiError} from "../lib/api.ts";
+import {t} from "../lib/i18n.ts";
 import {requestCode, verifyCode} from "../lib/sync.ts";
 
 interface Props {
@@ -15,8 +16,8 @@ interface Props {
 const RESEND_SECONDS = 60;
 
 function describe(error: unknown): string {
-  if (error instanceof ApiError) return error.code === "network" ? "网络不可用，请检查连接后再试" : error.message;
-  return "出了点问题，请再试一次";
+  if (error instanceof ApiError) return error.code === "network" ? t("auth.errorNetwork") : error.message;
+  return t("auth.errorGeneric");
 }
 
 export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onSignedIn}: Props) {
@@ -81,9 +82,9 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
         <Modal.Dialog className="sm:max-w-sm">
           <Modal.CloseTrigger />
           <Modal.Header>
-            <Modal.Heading>{step === "email" ? "登录 Easel" : "输入验证码"}</Modal.Heading>
+            <Modal.Heading>{step === "email" ? t("auth.title") : t("auth.codeTitle")}</Modal.Heading>
             <p className="mt-1.5 text-sm leading-6 text-muted">
-              {step === "email" ? (reason ?? "用邮箱验证码登录，无需密码。未开启同步的作品仍只保存在这台设备上。") : `验证码已发送到 ${email.trim()}，10 分钟内有效。`}
+              {step === "email" ? (reason ?? t("auth.intro")) : t("auth.codeSent", {email: email.trim()})}
             </p>
           </Modal.Header>
           <Modal.Body>
@@ -96,12 +97,12 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                 }}
               >
                 <TextField isRequired name="email" type="email" value={email} onChange={setEmail} isInvalid={error !== ""} autoFocus>
-                  <Label>邮箱</Label>
+                  <Label>{t("auth.email")}</Label>
                   <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
                   {error ? <FieldError>{error}</FieldError> : null}
                 </TextField>
                 <Button type="submit" variant="primary" isPending={pending} className="w-full">
-                  获取验证码
+                  {t("auth.getCode")}
                 </Button>
               </Form>
             ) : (
@@ -113,8 +114,8 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                 }}
               >
                 <div className="flex flex-col gap-2">
-                  <Label>6 位验证码</Label>
-                  <InputOTP maxLength={6} value={code} onChange={setCode} onComplete={(value) => void verify(value)} isInvalid={error !== ""} autoFocus aria-label="6 位验证码">
+                  <Label>{t("auth.codeLabel")}</Label>
+                  <InputOTP maxLength={6} value={code} onChange={setCode} onComplete={(value) => void verify(value)} isInvalid={error !== ""} autoFocus aria-label={t("auth.codeLabel")}>
                     <InputOTP.Group>
                       {[0, 1, 2].map((index) => (
                         <InputOTP.Slot key={index} index={index} />
@@ -127,17 +128,17 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                       ))}
                     </InputOTP.Group>
                   </InputOTP>
-                  {error ? <p className="text-sm text-danger" role="alert">{error}</p> : <Description>没收到？看看垃圾邮件箱。</Description>}
+                  {error ? <p className="text-sm text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
                 </div>
                 <Button type="submit" variant="primary" isPending={pending} isDisabled={code.length !== 6} className="w-full">
-                  登录
+                  {t("common.signIn")}
                 </Button>
                 <div className="flex items-center justify-between gap-2">
                   <Button size="sm" variant="ghost" className="-ms-2.5" onPress={() => { setStep("email"); setError(""); }}>
-                    换个邮箱
+                    {t("auth.changeEmail")}
                   </Button>
                   <Button size="sm" variant="ghost" className="-me-2.5" isDisabled={wait > 0 || pending} onPress={() => void send()}>
-                    {wait > 0 ? `${wait} 秒后可重新发送` : "重新发送"}
+                    {wait > 0 ? t("auth.resendIn", {seconds: wait}) : t("auth.resend")}
                   </Button>
                 </div>
               </Form>

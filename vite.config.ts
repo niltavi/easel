@@ -15,8 +15,8 @@ export default defineConfig({
       manifest: {
         name: "Easel",
         short_name: "Easel",
-        description: "可离线使用的个人画板",
-        lang: "zh-CN",
+        description: "A personal whiteboard that works offline",
+        lang: "en",
         display: "standalone",
         start_url: "/",
         background_color: "#F5F1E6",

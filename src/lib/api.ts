@@ -1,3 +1,4 @@
+import {locale, t} from "./i18n.ts";
 import type {AiRequest, AiResponse, ErrorBody, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../../shared/api.ts";
 
 export class ApiError extends Error {
@@ -25,14 +26,15 @@ async function request<T>(method: string, path: string, {token, body, signal}: O
       method,
       signal,
       headers: {
+        "accept-language": locale,
         ...(body === undefined ? {} : {"content-type": "application/json"}),
         ...(token ? {authorization: `Bearer ${token}`} : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (error) {
-    if (signal?.aborted) throw new ApiError("aborted", 0, "已取消");
-    throw new ApiError("network", 0, "网络不可用", error);
+    if (signal?.aborted) throw new ApiError("aborted", 0, t("api.aborted"));
+    throw new ApiError("network", 0, t("api.network"), error);
   }
   const text = await response.text();
   let json: unknown = null;
@@ -43,7 +45,7 @@ async function request<T>(method: string, path: string, {token, body, signal}: O
   }
   if (!response.ok) {
     const error = json as Partial<ErrorBody> | null;
-    throw new ApiError(error?.error ?? "server_error", response.status, error?.message ?? "服务暂时不可用", json);
+    throw new ApiError(error?.error ?? "server_error", response.status, error?.message ?? t("api.unavailable"), json);
   }
   return json as T;
 }

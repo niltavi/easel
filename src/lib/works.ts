@@ -1,6 +1,7 @@
 // Local work management: create, open, save, rename, duplicate, delete, import. All of it works offline.
 import * as store from "./db.ts";
 import {parseDocument, serializeDocument} from "./file.ts";
+import {t} from "./i18n.ts";
 import {currentWork, editor, getState, isAvailable, notify, setState, visibleWorks} from "./state.ts";
 import type {Scene, Session, WorkMeta} from "./types.ts";
 import {emptyScene} from "./types.ts";
@@ -57,7 +58,7 @@ async function setCurrent(id: string) {
 
 export async function createWork(): Promise<string> {
   await editor.flush();
-  const meta = blankMeta(uniqueName("未命名"));
+  const meta = blankMeta(uniqueName(t("name.untitled")));
   await store.putWork(meta, emptyScene());
   await setCurrent(meta.id);
   return meta.id;
@@ -83,7 +84,7 @@ export async function ensureCurrent() {
   const next = visible.find(isAvailable);
   if (next) await setCurrent(next.id);
   else {
-    const meta = blankMeta(uniqueName("未命名"));
+    const meta = blankMeta(uniqueName(t("name.untitled")));
     await store.putWork(meta, emptyScene());
     await setCurrent(meta.id);
   }
@@ -120,10 +121,10 @@ export async function saveScene(id: string, scene: Scene, contentChanged: boolea
     if (getState().save !== "failed") {
       notify({
         kind: "danger",
-        title: "没能保存到这台设备",
-        description: "改动还在当前页面里。请先导出文件备份，再检查浏览器的存储空间。",
+        title: t("save.failedTitle"),
+        description: t("save.failedBody"),
         sticky: true,
-        action: {label: "导出文件", run: () => editor.exportFile()},
+        action: {label: t("common.exportFile"), run: () => editor.exportFile()},
       });
     }
     setState({save: "failed"});
@@ -154,7 +155,7 @@ export async function duplicateWork(id: string): Promise<string | null> {
   const source = await store.getWork(id);
   const scene = await store.getScene(id);
   if (!source || !scene) return null;
-  const meta = {...blankMeta(uniqueName(`${source.name} 副本`), source.account)};
+  const meta = {...blankMeta(uniqueName(t("name.copy", {name: source.name})), source.account)};
   await store.putWork(meta, scene);
   await setCurrent(meta.id);
   return meta.id;

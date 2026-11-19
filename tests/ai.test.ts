@@ -9,7 +9,7 @@ let token: string;
 let clock: number;
 let seen: unknown[];
 
-const goodOps = [{op: "add_node", node: {id: "a", kind: "rectangle", x: 0, y: 0, width: 160, height: 64, text: "开始"}}];
+const goodOps = [{op: "add_node", node: {id: "a", kind: "rectangle", x: 0, y: 0, width: 160, height: 64, text: "Start"}}];
 const empty = {nodes: [], edges: []};
 
 const preview = (body: unknown, signal?: AbortSignal) =>
@@ -45,7 +45,7 @@ describe("AI preview endpoint", () => {
   });
 
   it("returns validated ops and hands only the diagram structure to the model", async () => {
-    const res = await preview({prompt: "画一个流程", diagram: empty});
+    const res = await preview({prompt: "Draw a flow", diagram: empty});
     expect(res.status).toBe(200);
     const body = (await res.json()) as {ops: unknown[]; quota: {remaining: number}};
     expect(body.ops).toEqual(goodOps);
@@ -57,11 +57,11 @@ describe("AI preview endpoint", () => {
     provider = async () => [{op: "delete", id: "does-not-exist"}];
     expect((await preview({prompt: "x", diagram: empty})).status).toBe(502);
     provider = async () => {
-      throw new AiError("ai_unavailable", "AI 暂时不可用");
+      throw new AiError("ai_unavailable", "aiUnavailable");
     };
     expect((await preview({prompt: "x", diagram: empty})).status).toBe(503);
     provider = (_p, _d, signal) =>
-      new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new AiError("ai_timeout", "超时"))));
+      new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new AiError("ai_timeout", "aiTimeout"))));
     expect((await preview({prompt: "x", diagram: empty})).status).toBe(504);
     expect((await quota()).remaining).toBe(2);
   });

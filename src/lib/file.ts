@@ -1,4 +1,5 @@
 // .easel native file: JSON with a format version. Cloud snapshots use the same format.
+import {t} from "./i18n.ts";
 import type {Scene} from "./types.ts";
 import {emptyView} from "./types.ts";
 
@@ -41,27 +42,27 @@ export function parseDocument(text: string): {name: string; scene: Scene} {
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new EaselFileError("invalid", "这不是有效的 Easel 文件");
+    throw new EaselFileError("invalid", t("file.invalid"));
   }
   if (!isRecord(raw) || raw.type !== "easel" || !Number.isInteger(raw.version)) {
-    throw new EaselFileError("invalid", "这不是有效的 Easel 文件");
+    throw new EaselFileError("invalid", t("file.invalid"));
   }
   if ((raw.version as number) > EASEL_FORMAT_VERSION || (raw.version as number) < 1) {
-    throw new EaselFileError("unsupported_version", "这个文件来自更新版本的 Easel，当前版本无法打开");
+    throw new EaselFileError("unsupported_version", t("file.newer"));
   }
   const scene = raw.scene;
   if (raw.engine !== "excalidraw" || !isRecord(scene) || !Array.isArray(scene.elements)) {
-    throw new EaselFileError("invalid", "文件内容不完整，无法打开");
+    throw new EaselFileError("invalid", t("file.incomplete"));
   }
   for (const element of scene.elements) {
     if (!isRecord(element) || typeof element.id !== "string" || typeof element.type !== "string") {
-      throw new EaselFileError("invalid", "文件内容不完整，无法打开");
+      throw new EaselFileError("invalid", t("file.incomplete"));
     }
   }
   const view = isRecord(scene.view) ? scene.view : {};
   const zoom = finite(view.zoom, emptyView.zoom);
   return {
-    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 120) : "未命名",
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 120) : t("name.untitled"),
     scene: {
       elements: scene.elements,
       files: isRecord(scene.files) ? scene.files : {},
@@ -77,5 +78,5 @@ export function parseDocument(text: string): {name: string; scene: Scene} {
 /** Strip characters that the various platforms don't allow in file names. */
 export function safeFileName(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").trim().slice(0, 80);
-  return cleaned || "未命名";
+  return cleaned || t("name.untitled");
 }

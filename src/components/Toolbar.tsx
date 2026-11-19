@@ -3,6 +3,7 @@ import {Button, ButtonGroup, ColorSwatchPicker, parseColor, Separator, ToggleBut
 import {useEffect, useRef, useState, type ReactNode} from "react";
 import type {OpsSummary} from "../../shared/diagram.ts";
 import type {EditorHandle, EditorUi} from "../editor/Editor.tsx";
+import {t} from "../lib/i18n.ts";
 import {CONNECTOR_TOOLS, INKS, SHAPE_TOOLS, TOOL_KEYS, TOOL_LABEL, WIDTHS, type ConnectorTool, type ShapeTool, type Tool} from "../editor/tools.ts";
 import {CursorIcon, DiamondIcon, EllipseIcon, LineIcon} from "./icons.tsx";
 
@@ -50,9 +51,9 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
     {id: "select", tool: "select", label: TOOL_LABEL.select},
     {id: "pen", tool: "pen", label: TOOL_LABEL.pen},
     {id: "eraser", tool: "eraser", label: TOOL_LABEL.eraser},
-    {id: "shape", tool: shape, label: "形状"},
+    {id: "shape", tool: shape, label: t("tool.shape")},
     {id: "text", tool: "text", label: TOOL_LABEL.text},
-    {id: "connector", tool: connector, label: "连线"},
+    {id: "connector", tool: connector, label: t("tool.connector")},
   ];
   // Number keys 1–6 switch tools directly; don't steal keys while text is being typed or a dialog or menu is open.
   const entriesRef = useRef(entries);
@@ -83,21 +84,21 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
   return (
     <>
       {showInk && (
-        <Toolbar aria-label="属性" className="easel-bar easel-bar--props">
+        <Toolbar aria-label={t("toolbar.properties")} className="easel-bar easel-bar--props">
           {isShape(ui.tool) && (
             <>
-              <KindPicker label="形状" value={ui.tool} options={SHAPE_TOOLS} onChange={pick} />
+              <KindPicker label={t("tool.shape")} value={ui.tool} options={SHAPE_TOOLS} onChange={pick} />
               <Separator orientation="vertical" />
             </>
           )}
           {isConnector(ui.tool) && (
             <>
-              <KindPicker label="连线" value={ui.tool} options={CONNECTOR_TOOLS} onChange={pick} />
+              <KindPicker label={t("tool.connector")} value={ui.tool} options={CONNECTOR_TOOLS} onChange={pick} />
               <Separator orientation="vertical" />
             </>
           )}
           <ColorSwatchPicker
-            aria-label="颜色"
+            aria-label={t("toolbar.colour")}
             size="sm"
             className="easel-inks"
             value={parseColor(ui.strokeColor)}
@@ -114,7 +115,7 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
             <>
               <Separator orientation="vertical" />
               <ToggleButtonGroup
-                aria-label="粗细"
+                aria-label={t("toolbar.width")}
                 size="sm"
                 selectionMode="single"
                 disallowEmptySelection
@@ -125,7 +126,7 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
                 }}
               >
                 {WIDTHS.map((width, index) => (
-                  <ToggleButton key={width.value} id={String(width.value)} isIconOnly aria-label={`${width.name}线`}>
+                  <ToggleButton key={width.value} id={String(width.value)} isIconOnly aria-label={t("width.line", {name: width.name})}>
                     {index > 0 && <ToggleButtonGroup.Separator />}
                     <span className="easel-weight" style={{height: width.value + 1}} aria-hidden />
                   </ToggleButton>
@@ -136,8 +137,8 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
           {ui.selected > 0 && (
             <>
               <Separator orientation="vertical" />
-              <Tip label="删除所选">
-                <Button isIconOnly size="sm" variant="ghost" aria-label="删除所选" onPress={() => editor()?.deleteSelected()}>
+              <Tip label={t("toolbar.deleteSelected")}>
+                <Button isIconOnly size="sm" variant="ghost" aria-label={t("toolbar.deleteSelected")} onPress={() => editor()?.deleteSelected()}>
                   <TrashBin aria-hidden />
                 </Button>
               </Tip>
@@ -145,9 +146,9 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
           )}
         </Toolbar>
       )}
-      <Toolbar aria-label="绘图工具" className="easel-bar">
+      <Toolbar aria-label={t("toolbar.drawing")} className="easel-bar">
         <ToggleButtonGroup
-          aria-label="工具"
+          aria-label={t("toolbar.tools")}
           size="sm"
           selectionMode="single"
           disallowEmptySelection
@@ -171,21 +172,21 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
         </ToggleButtonGroup>
         <Separator orientation="vertical" />
         <ButtonGroup size="sm" variant="tertiary">
-          <Tip label="撤销">
-            <Button isIconOnly variant="tertiary" aria-label="撤销" onPress={() => editor()?.undo()}>
+          <Tip label={t("common.undo")}>
+            <Button isIconOnly variant="tertiary" aria-label={t("common.undo")} onPress={() => editor()?.undo()}>
               <ArrowUturnCcwLeft aria-hidden />
             </Button>
           </Tip>
-          <Tip label="重做">
-            <Button isIconOnly variant="tertiary" aria-label="重做" onPress={() => editor()?.redo()}>
+          <Tip label={t("common.redo")}>
+            <Button isIconOnly variant="tertiary" aria-label={t("common.redo")} onPress={() => editor()?.redo()}>
               <ButtonGroup.Separator />
               <ArrowUturnCwRight aria-hidden />
             </Button>
           </Tip>
         </ButtonGroup>
         <Separator orientation="vertical" />
-        <Tip label="用 AI 画图或改图">
-          <Button isIconOnly size="sm" variant="tertiary" aria-label="用 AI 画图或改图" onPress={onAi}>
+        <Tip label={t("ai.title")}>
+          <Button isIconOnly size="sm" variant="tertiary" aria-label={t("ai.title")} onPress={onAi}>
             <Sparkles aria-hidden />
           </Button>
         </Tip>
@@ -219,12 +220,12 @@ function KindPicker<T extends Tool>({label, value, options, onChange}: {label: s
 
 export function PreviewBar({summary, onApply, onCancel}: {summary: OpsSummary; onApply: () => void; onCancel: () => void}) {
   const parts = [
-    summary.added ? {kind: "added", text: `新增 ${summary.added}`} : null,
-    summary.updated ? {kind: "updated", text: `修改 ${summary.updated}`} : null,
-    summary.deleted ? {kind: "deleted", text: `删除 ${summary.deleted}`} : null,
+    summary.added ? {kind: "added", text: t("preview.added", {count: summary.added})} : null,
+    summary.updated ? {kind: "updated", text: t("preview.updated", {count: summary.updated})} : null,
+    summary.deleted ? {kind: "deleted", text: t("preview.deleted", {count: summary.deleted})} : null,
   ].filter((part) => part !== null);
   return (
-    <div className="easel-bar easel-bar--preview" role="group" aria-label="AI 改动预览">
+    <div className="easel-bar easel-bar--preview" role="group" aria-label={t("preview.label")}>
       <p className="easel-preview__summary">
         {parts.map((part) => (
           <span key={part.kind} className="easel-preview__count" data-kind={part.kind}>
@@ -233,10 +234,10 @@ export function PreviewBar({summary, onApply, onCancel}: {summary: OpsSummary; o
         ))}
       </p>
       <Button size="sm" variant="tertiary" onPress={onCancel}>
-        放弃
+        {t("preview.discard")}
       </Button>
       <Button size="sm" variant="primary" onPress={onApply}>
-        应用
+        {t("preview.apply")}
       </Button>
     </div>
   );

@@ -5,6 +5,7 @@ import type {AppState as CanvasState, BinaryFiles, ExcalidrawImperativeAPI} from
 import {useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref} from "react";
 import type {Diagram, OpsSummary} from "../../shared/diagram.ts";
 import {serializeDocument} from "../lib/file.ts";
+import {locale, t} from "../lib/i18n.ts";
 import {currentWork, editor as editorBridge, getState, notify} from "../lib/state.ts";
 import {scheduleSync} from "../lib/sync.ts";
 import type {Scene} from "../lib/types.ts";
@@ -380,7 +381,7 @@ export function Editor({workId, nonce, theme, onUi, ref}: Props) {
         if (!api || !work) return;
         const elements = api.getSceneElements();
         if (elements.length === 0) {
-          notify({kind: "info", title: "画布还是空的", description: "画点什么再导出图片。"});
+          notify({kind: "info", title: t("export.emptyTitle"), description: t("export.emptyBody")});
           return;
         }
         const blob = await exportToBlob({
@@ -426,7 +427,7 @@ export function Editor({workId, nonce, theme, onUi, ref}: Props) {
           }}
           onChange={onChange}
           theme={theme}
-          langCode="zh-CN"
+          langCode={locale}
           viewModeEnabled={previewing !== null}
           UIOptions={{canvasActions: {loadScene: false, saveToActiveFile: false, export: false, saveAsImage: false, clearCanvas: false, changeViewBackgroundColor: false, toggleTheme: false}}}
         />

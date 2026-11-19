@@ -3,6 +3,7 @@ import {Button, Label, Sheet, TextArea, TextField} from "@heroui/react";
 import {useEffect, useState} from "react";
 import type {Quota} from "../../shared/api.ts";
 import {MAX_AI_OBJECTS, MAX_PROMPT_LENGTH} from "../../shared/diagram.ts";
+import {locale, t} from "../lib/i18n.ts";
 
 interface Props {
   isOpen: boolean;
@@ -17,12 +18,23 @@ interface Props {
   onClose: () => void;
 }
 
-const SUGGESTIONS = ["画一个请假审批流程，包含通过和驳回两个分支", "给审批流程加一个驳回分支", "在开头加一个“提交申请”步骤"];
+const SUGGESTIONS = [t("ai.suggestDraw"), t("ai.suggestBranch"), t("ai.suggestStep")];
 
-function resetText(quota: Quota): string {
-  const time = new Date(quota.resetAt).toLocaleTimeString("zh-CN", {hour: "2-digit", minute: "2-digit"});
+/** When the quota resets: the local time, and whether that is tomorrow. */
+function resetTime(quota: Quota): {time: string; tomorrow: boolean} {
+  const time = new Date(quota.resetAt).toLocaleTimeString(locale, {hour: "2-digit", minute: "2-digit"});
   const tomorrow = new Date(quota.resetAt).getDate() !== new Date().getDate();
-  return `${tomorrow ? "明天 " : ""}${time} 重置`;
+  return {time, tomorrow};
+}
+
+function exhaustedText(quota: Quota): string {
+  const {time, tomorrow} = resetTime(quota);
+  return t(tomorrow ? "ai.exhaustedTomorrow" : "ai.exhausted", {limit: quota.limit, time});
+}
+
+function remainingText(quota: Quota): string {
+  const {time, tomorrow} = resetTime(quota);
+  return t(tomorrow ? "ai.remainingTomorrow" : "ai.remaining", {count: quota.remaining, time});
 }
 
 export function AiPanel(props: Props) {
@@ -31,7 +43,7 @@ export function AiPanel(props: Props) {
       <Sheet isOpen={props.isOpen} onOpenChange={(open) => !open && props.onClose()}>
         <Sheet.Backdrop>
           <Sheet.Content>
-            <Sheet.Dialog aria-label="用 AI 画图或改图">
+            <Sheet.Dialog aria-label={t("ai.title")}>
               <Sheet.Handle />
               <Sheet.Body>
                 <AiForm {...props} />
@@ -44,7 +56,7 @@ export function AiPanel(props: Props) {
   }
   if (!props.isOpen) return null;
   return (
-    <section className="easel-ai nt-fade-up" aria-label="用 AI 画图或改图">
+    <section className="easel-ai nt-fade-up" aria-label={t("ai.title")}>
       <AiForm {...props} />
     </section>
   );
@@ -71,19 +83,19 @@ function AiForm({isOpen, isMobile, pending, error, quota, objectCount, onSubmit,
     >
       <div className="flex items-center gap-2">
         <Sparkles aria-hidden className="text-accent-soft-foreground" />
-        <h2 className="text-sm font-medium">{objectCount > 0 ? "让 AI 修改这张图" : "让 AI 画一张流程图"}</h2>
+        <h2 className="text-sm font-medium">{objectCount > 0 ? t("ai.headingEdit") : t("ai.headingDraw")}</h2>
         {!isMobile && (
-          <Button isIconOnly size="sm" variant="ghost" aria-label="关闭" className="ms-auto" onPress={onClose}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label={t("common.close")} className="ms-auto" onPress={onClose}>
             <Xmark aria-hidden />
           </Button>
         )}
       </div>
-      <TextField aria-label="指令" value={prompt} onChange={setPrompt} isDisabled={pending || blocked} autoFocus>
-        <Label className="sr-only">指令</Label>
+      <TextField aria-label={t("ai.prompt")} value={prompt} onChange={setPrompt} isDisabled={pending || blocked} autoFocus>
+        <Label className="sr-only">{t("ai.prompt")}</Label>
         <TextArea
           rows={3}
           maxLength={MAX_PROMPT_LENGTH}
-          placeholder={objectCount > 0 ? "例如：给审批流程加一个驳回分支" : "例如：画一个请假审批流程"}
+          placeholder={objectCount > 0 ? t("ai.placeholderEdit") : t("ai.placeholderDraw")}
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit();
           }}
@@ -100,29 +112,29 @@ function AiForm({isOpen, isMobile, pending, error, quota, objectCount, onSubmit,
       )}
       {overLimit ? (
         <p className="text-sm leading-6 text-warning-soft-foreground" role="status">
-          这件作品有 {objectCount} 个形状、文字和连线，超过了 AI 一次能处理的 {MAX_AI_OBJECTS} 个。你仍然可以手动编辑。
+          {t("ai.overLimit", {count: objectCount, max: MAX_AI_OBJECTS})}
         </p>
       ) : exhausted ? (
         <p className="text-sm leading-6 text-warning-soft-foreground" role="status">
-          今天的 {quota.limit} 次 AI 预览已用完，{resetText(quota)}。
+          {exhaustedText(quota)}
         </p>
       ) : error ? (
         <p className="text-sm leading-6 text-danger" role="alert">
           {error}
         </p>
       ) : (
-        <p className="text-xs leading-5 text-muted">只发送这条指令和画布上的形状、文字、连线。手写笔迹和其他作品留在这台设备上。</p>
+        <p className="text-xs leading-5 text-muted">{t("ai.privacy")}</p>
       )}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted">{quota && !exhausted ? `今天还可预览 ${quota.remaining} 次 · ${resetText(quota)}` : ""}</span>
+        <span className="text-xs text-muted">{quota && !exhausted ? remainingText(quota) : ""}</span>
         <span className="ms-auto" />
         {pending ? (
           <Button size="sm" variant="tertiary" onPress={onClose}>
-            取消
+            {t("common.cancel")}
           </Button>
         ) : null}
         <Button type="submit" size="sm" variant="primary" isPending={pending} isDisabled={!text || blocked}>
-          {pending ? "正在生成" : "生成预览"}
+          {pending ? t("ai.generating") : t("ai.generate")}
         </Button>
       </div>
     </form>

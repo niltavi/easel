@@ -1,6 +1,7 @@
 import {BarsDescendingAlignLeft, ArrowRightFromSquare, Cloud, CloudArrowUpIn, CloudCheck, Display, Ellipsis, FileArrowUp, Person, Plus} from "@gravity-ui/icons";
 import {Button, Dropdown, Label, SearchField, Separator} from "@heroui/react";
 import {useMemo, useState, type ReactNode} from "react";
+import {locale, t} from "../lib/i18n.ts";
 import {STATUS_LABEL, workStatus, type Session, type WorkMeta, type WorkStatus} from "../lib/types.ts";
 
 export type WorkAction = "rename" | "duplicate" | "sync-on" | "sync-off" | "export" | "delete";
@@ -33,10 +34,10 @@ export function StatusLine({work, compact = false}: {work: WorkMeta; compact?: b
 type SortKey = "updated" | "opened" | "name" | "created";
 
 const SORTS: {key: SortKey; label: string}[] = [
-  {key: "updated", label: "最近修改"},
-  {key: "opened", label: "最近打开"},
-  {key: "name", label: "名称"},
-  {key: "created", label: "创建时间"},
+  {key: "updated", label: t("sort.updated")},
+  {key: "opened", label: t("sort.opened")},
+  {key: "name", label: t("sort.name")},
+  {key: "created", label: t("sort.created")},
 ];
 
 const SORT_STORAGE = "easel.sort";
@@ -51,7 +52,7 @@ function readSort(): SortKey {
   return "updated";
 }
 
-const collator = new Intl.Collator("zh-CN", {numeric: true, sensitivity: "base"});
+const collator = new Intl.Collator(locale, {numeric: true, sensitivity: "base"});
 
 function sortWorks(works: WorkMeta[], key: SortKey): WorkMeta[] {
   // The incoming list is already sorted by most recently modified.
@@ -67,33 +68,33 @@ export function WorkMenuItems({work}: {work: WorkMeta}) {
   const status = workStatus(work);
   if (status === "remote") {
     return (
-      <Dropdown.Item key="delete" id="delete" textValue="删除" variant="danger">
-        <Label>删除</Label>
+      <Dropdown.Item key="delete" id="delete" textValue={t("common.delete")} variant="danger">
+        <Label>{t("common.delete")}</Label>
       </Dropdown.Item>
     );
   }
   return (
     <>
-      <Dropdown.Item key="rename" id="rename" textValue="重命名">
-        <Label>重命名</Label>
+      <Dropdown.Item key="rename" id="rename" textValue={t("common.rename")}>
+        <Label>{t("common.rename")}</Label>
       </Dropdown.Item>
-      <Dropdown.Item key="duplicate" id="duplicate" textValue="创建副本">
-        <Label>创建副本</Label>
+      <Dropdown.Item key="duplicate" id="duplicate" textValue={t("menu.duplicate")}>
+        <Label>{t("menu.duplicate")}</Label>
       </Dropdown.Item>
-      <Dropdown.Item key="export" id="export" textValue="导出文件">
-        <Label>导出文件</Label>
+      <Dropdown.Item key="export" id="export" textValue={t("common.exportFile")}>
+        <Label>{t("common.exportFile")}</Label>
       </Dropdown.Item>
       {work.cloud ? (
-        <Dropdown.Item key="sync-off" id="sync-off" textValue="关闭云同步">
-          <Label>关闭云同步</Label>
+        <Dropdown.Item key="sync-off" id="sync-off" textValue={t("menu.syncOff")}>
+          <Label>{t("menu.syncOff")}</Label>
         </Dropdown.Item>
       ) : (
-        <Dropdown.Item key="sync-on" id="sync-on" textValue="开启云同步">
-          <Label>开启云同步</Label>
+        <Dropdown.Item key="sync-on" id="sync-on" textValue={t("menu.syncOn")}>
+          <Label>{t("menu.syncOn")}</Label>
         </Dropdown.Item>
       )}
-      <Dropdown.Item key="delete" id="delete" textValue="删除" variant="danger">
-        <Label>删除</Label>
+      <Dropdown.Item key="delete" id="delete" textValue={t("common.delete")} variant="danger">
+        <Label>{t("common.delete")}</Label>
       </Dropdown.Item>
     </>
   );
@@ -130,14 +131,14 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
   return (
     <div className="easel-works">
       <div className="easel-works__head">
-        <h2 className="easel-works__title">个人工作区</h2>
+        <h2 className="easel-works__title">{t("works.workspace")}</h2>
         <Dropdown>
-          <Button isIconOnly size="sm" variant="ghost" aria-label={`排序方式：${SORTS.find((item) => item.key === sort)?.label}`}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label={t("sort.current", {label: SORTS.find((item) => item.key === sort)?.label ?? ""})}>
             <BarsDescendingAlignLeft aria-hidden />
           </Button>
           <Dropdown.Popover placement="bottom end">
             <Dropdown.Menu
-              aria-label="排序方式"
+              aria-label={t("sort.label")}
               selectionMode="single"
               disallowEmptySelection
               selectedKeys={[sort]}
@@ -155,22 +156,22 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown>
-        <Button isIconOnly size="sm" variant="ghost" aria-label="导入文件" onPress={onImport}>
+        <Button isIconOnly size="sm" variant="ghost" aria-label={t("common.importFile")} onPress={onImport}>
           <FileArrowUp aria-hidden />
         </Button>
-        <Button isIconOnly size="sm" variant="secondary" aria-label="新建作品" onPress={onNew}>
+        <Button isIconOnly size="sm" variant="secondary" aria-label={t("works.new")} onPress={onNew}>
           <Plus aria-hidden />
         </Button>
       </div>
-      <SearchField aria-label="按名称搜索作品" value={query} onChange={setQuery} className="easel-works__search">
+      <SearchField aria-label={t("works.searchLabel")} value={query} onChange={setQuery} className="easel-works__search">
         <SearchField.Group>
           <SearchField.SearchIcon />
-          <SearchField.Input placeholder="搜索作品" />
-          <SearchField.ClearButton aria-label="清除搜索" />
+          <SearchField.Input placeholder={t("works.search")} />
+          <SearchField.ClearButton aria-label={t("works.clearSearch")} />
         </SearchField.Group>
       </SearchField>
-      <nav aria-label="作品" className="easel-works__list">
-        {filtered.length === 0 && <p className="easel-works__empty">没有名称包含“{query.trim()}”的作品</p>}
+      <nav aria-label={t("works.nav")} className="easel-works__list">
+        {filtered.length === 0 && <p className="easel-works__empty">{t("works.empty", {query: query.trim()})}</p>}
         {filtered.map((work) => (
           <div key={work.id} className="easel-work" data-current={work.id === currentId ? "" : undefined}>
             <button type="button" className="easel-work__open" aria-current={work.id === currentId ? "page" : undefined} onClick={() => onOpen(work.id)}>
@@ -178,7 +179,7 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
               <StatusLine work={work} />
             </button>
             <Dropdown>
-              <Button isIconOnly size="sm" variant="ghost" aria-label={`「${work.name}」的更多操作`} className="easel-work__more">
+              <Button isIconOnly size="sm" variant="ghost" aria-label={t("works.more", {name: work.name})} className="easel-work__more">
                 <Ellipsis aria-hidden />
               </Button>
               <Dropdown.Popover placement="bottom end">
@@ -197,22 +198,22 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
             <Person aria-hidden className="easel-works__avatar" />
             <div className="easel-works__who">
               <span className="easel-works__email">{session.user.email}</span>
-              {session.expired && <span className="easel-works__hint">登录已过期</span>}
+              {session.expired && <span className="easel-works__hint">{t("session.expired")}</span>}
             </div>
             {session.expired && (
               <Button size="sm" variant="secondary" onPress={onSignIn}>
-                重新登录
+                {t("common.signInAgain")}
               </Button>
             )}
-            <Button isIconOnly size="sm" variant="ghost" aria-label="退出登录" onPress={onSignOut}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label={t("common.signOut")} onPress={onSignOut}>
               <ArrowRightFromSquare aria-hidden />
             </Button>
           </>
         ) : (
           <>
-            <p className="easel-works__hint">作品保存在这台设备上。登录后可以为单件作品开启云同步。</p>
+            <p className="easel-works__hint">{t("works.guestHint")}</p>
             <Button size="sm" variant="secondary" onPress={onSignIn}>
-              登录
+              {t("common.signIn")}
             </Button>
           </>
         )}

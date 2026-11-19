@@ -1,3 +1,5 @@
+import {t} from "../lib/i18n.ts";
+
 export type Tool = "select" | "pen" | "eraser" | "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line";
 
 export const SHAPE_TOOLS = ["rectangle", "ellipse", "diamond"] as const;
@@ -6,33 +8,33 @@ export type ShapeTool = (typeof SHAPE_TOOLS)[number];
 export type ConnectorTool = (typeof CONNECTOR_TOOLS)[number];
 
 export const TOOL_LABEL: Record<Tool, string> = {
-  select: "选择",
-  pen: "笔",
-  eraser: "橡皮",
-  rectangle: "矩形",
-  ellipse: "椭圆",
-  diamond: "菱形",
-  text: "文字",
-  arrow: "箭头",
-  line: "直线",
+  select: t("tool.select"),
+  pen: t("tool.pen"),
+  eraser: t("tool.eraser"),
+  rectangle: t("tool.rectangle"),
+  ellipse: t("tool.ellipse"),
+  diamond: t("tool.diamond"),
+  text: t("tool.text"),
+  arrow: t("tool.arrow"),
+  line: t("tool.line"),
 };
 
 // Colours for work content, taken from the Niltavi palette (ink, niltava-600, rufous-600, leaf-600, gold-600, berry-600).
 // They are written into work files, so they are stored as fixed colour values and don't follow the UI theme.
 export const INKS = [
-  {name: "墨色", value: "#283e38"},
-  {name: "钴蓝", value: "#3a5cf4"},
-  {name: "赭红", value: "#bf4100"},
-  {name: "叶绿", value: "#00874f"},
-  {name: "金棕", value: "#9a6400"},
-  {name: "莓红", value: "#d30033"},
+  {name: t("ink.ink"), value: "#283e38"},
+  {name: t("ink.cobalt"), value: "#3a5cf4"},
+  {name: t("ink.rufous"), value: "#bf4100"},
+  {name: t("ink.leaf"), value: "#00874f"},
+  {name: t("ink.gold"), value: "#9a6400"},
+  {name: t("ink.berry"), value: "#d30033"},
 ] as const;
 export const DEFAULT_INK = INKS[0].value;
 
 export const WIDTHS = [
-  {name: "细", value: 1},
-  {name: "中", value: 2},
-  {name: "粗", value: 4},
+  {name: t("width.thin"), value: 1},
+  {name: t("width.medium"), value: 2},
+  {name: t("width.thick"), value: 4},
 ] as const;
 
 export type WidthLevel = (typeof WIDTHS)[number]["value"];

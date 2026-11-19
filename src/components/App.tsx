@@ -9,6 +9,7 @@ import {DEFAULT_INK} from "../editor/tools.ts";
 import {api, ApiError} from "../lib/api.ts";
 import {EASEL_EXTENSION, EaselFileError} from "../lib/file.ts";
 import {useAppState, useIsMobile, useTheme} from "../lib/hooks.ts";
+import {localeName, otherLocale, setLocale, t} from "../lib/i18n.ts";
 import {currentWork, getState, notify, onNotice, setState, ui as uiBridge, visibleWorks} from "../lib/state.ts";
 import {activeSession, disableSync, enableSync, expireSession, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
 import {workStatus, type WorkMeta} from "../lib/types.ts";
@@ -127,12 +128,12 @@ export function App() {
     try {
       await importDocument(await file.text(), sanitizeScene);
       setDrawer(false);
-      notify({kind: "success", title: "已导入为一件新作品"});
+      notify({kind: "success", title: t("import.done")});
     } catch (error) {
       notify({
         kind: "danger",
-        title: "无法导入这个文件",
-        description: error instanceof EaselFileError ? error.message : "文件内容无法识别。当前作品没有受到影响。",
+        title: t("import.failed"),
+        description: error instanceof EaselFileError ? error.message : t("import.unrecognized"),
       });
     }
   };
@@ -140,7 +141,7 @@ export function App() {
   const turnOnSync = (target: WorkMeta) => {
     const run = () => void enableSync(target.id);
     if (activeSession()) run();
-    else setAuth({open: true, reason: "登录后，这件作品会同步到你的账号，可以在其他设备上继续编辑。", then: run});
+    else setAuth({open: true, reason: t("auth.syncReason"), then: run});
   };
 
   const onAction = (action: WorkAction, target: WorkMeta) => {
@@ -152,13 +153,13 @@ export function App() {
   };
 
   const openAi = () => {
-    if (!state.online) return notify({kind: "info", title: "AI 需要联网", description: "联网后再试。手动编辑不受影响。"});
+    if (!state.online) return notify({kind: "info", title: t("ai.offlineTitle"), description: t("ai.offlineBody")});
     const openPanel = () => {
       void refreshQuota();
       setAi({open: true, pending: false, error: "", count: countObjects(editorRef.current?.diagram().diagram ?? {nodes: [], edges: []})});
     };
     if (activeSession()) openPanel();
-    else setAuth({open: true, reason: "登录后可以使用 AI 画图和改图。使用 AI 不需要为作品开启云同步。", then: openPanel});
+    else setAuth({open: true, reason: t("auth.aiReason"), then: openPanel});
   };
 
   const closeAi = () => {
@@ -182,24 +183,24 @@ export function App() {
       setState({quota: response.quota});
       // The work was edited or switched while waiting: this result no longer matches the current canvas.
       if (getState().currentId !== workId || editor.contentVersion() !== version) {
-        setAi((value) => ({...value, pending: false, error: "生成期间作品有改动，这次的结果已作废。请重新生成。"}));
+        setAi((value) => ({...value, pending: false, error: t("ai.stale")}));
         return;
       }
       const checked = validateOps(diagram, response.ops);
       if (!checked.ok) {
-        setAi((value) => ({...value, pending: false, error: "AI 给出的改动无法应用，请再试一次。"}));
+        setAi((value) => ({...value, pending: false, error: t("ai.invalid")}));
         return;
       }
       editor.startPreview(diagram, checked.result);
       setAi((value) => ({...value, open: false, pending: false, error: ""}));
     } catch (error) {
       if (controller.signal.aborted) return;
-      let message = "出了点问题，请再试一次。";
+      let message = t("error.generic");
       if (error instanceof ApiError) {
         if (error.code === "unauthorized") {
           await expireSession();
-          message = "登录已过期，请重新登录后再试。";
-        } else if (error.code === "network") message = "网络不可用，请检查连接后再试。";
+          message = t("ai.sessionExpired");
+        } else if (error.code === "network") message = t("error.network");
         else message = error.message;
         if (error.code === "quota_exhausted") void refreshQuota();
       }
@@ -209,7 +210,7 @@ export function App() {
 
   if (state.phase === "loading" || !work) {
     return (
-      <div className="easel-loading" role="status" aria-label="正在打开">
+      <div className="easel-loading" role="status" aria-label={t("app.opening")}>
         <Spinner />
       </div>
     );
@@ -235,36 +236,36 @@ export function App() {
       <main className="easel-main">
         <header className="easel-top">
           <Tooltip delay={500}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label={isMobile ? "打开作品列表" : sidebar ? "收起作品列表" : "展开作品列表"} aria-expanded={isMobile ? drawer : sidebar} onPress={toggleSidebar}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label={isMobile ? t("app.openWorkList") : sidebar ? t("app.collapseWorkList") : t("app.expandWorkList")} aria-expanded={isMobile ? drawer : sidebar} onPress={toggleSidebar}>
               {isMobile ? <Bars aria-hidden /> : <LayoutSideContentLeft aria-hidden />}
             </Button>
-            <Tooltip.Content placement="bottom">作品列表</Tooltip.Content>
+            <Tooltip.Content placement="bottom">{t("app.workList")}</Tooltip.Content>
           </Tooltip>
           <WorkName key={work.id} work={work} />
           <div className="easel-top__state" aria-live="polite">
             {state.save === "failed" ? (
-              <span className="easel-status" data-status="failed">未保存到本机</span>
+              <span className="easel-status" data-status="failed">{t("status.saveFailed")}</span>
             ) : state.save === "saving" ? (
-              <span className="easel-status">保存中</span>
+              <span className="easel-status">{t("status.saving")}</span>
             ) : (
               <StatusLine work={work} compact />
             )}
             {!state.online && (
-              <span className="easel-status" title="离线">
+              <span className="easel-status" title={t("status.offline")}>
                 <CloudSlash aria-hidden width={12} height={12} />
-                <span className="easel-top__wide">离线</span>
+                <span className="easel-top__wide">{t("status.offline")}</span>
               </span>
             )}
           </div>
           <span className="ms-auto" />
           <Tooltip delay={500}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="把全部内容缩放到视野内" onPress={() => editorRef.current?.fit()}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.fitLabel")} onPress={() => editorRef.current?.fit()}>
               <ArrowsExpand aria-hidden />
             </Button>
-            <Tooltip.Content placement="bottom">缩放到全部内容</Tooltip.Content>
+            <Tooltip.Content placement="bottom">{t("app.fit")}</Tooltip.Content>
           </Tooltip>
           <Dropdown>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="作品菜单">
+            <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.workMenu")}>
               <Ellipsis aria-hidden />
             </Button>
             <Dropdown.Popover placement="bottom end">
@@ -273,19 +274,23 @@ export function App() {
                   if (key === "ai") openAi();
                   else if (key === "png") void editorRef.current?.exportPng();
                   else if (key === "import") void importFile();
+                  else if (key === "language") setLocale(otherLocale);
                   else onAction(key as WorkAction, work);
                 }}
               >
-                <Dropdown.Item id="ai" textValue="用 AI 画图或改图">
-                  <Label>用 AI 画图或改图</Label>
+                <Dropdown.Item id="ai" textValue={t("ai.title")}>
+                  <Label>{t("ai.title")}</Label>
                 </Dropdown.Item>
-                <Dropdown.Item id="png" textValue="导出 PNG">
-                  <Label>导出 PNG</Label>
+                <Dropdown.Item id="png" textValue={t("common.exportPng")}>
+                  <Label>{t("common.exportPng")}</Label>
                 </Dropdown.Item>
-                <Dropdown.Item id="import" textValue="导入文件">
-                  <Label>导入文件</Label>
+                <Dropdown.Item id="import" textValue={t("common.importFile")}>
+                  <Label>{t("common.importFile")}</Label>
                 </Dropdown.Item>
                 <WorkMenuItems work={work} />
+                <Dropdown.Item id="language" textValue={localeName(otherLocale)}>
+                  <Label lang={otherLocale}>{localeName(otherLocale)}</Label>
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown.Popover>
           </Dropdown>
@@ -307,7 +312,7 @@ export function App() {
 
       <Drawer.Backdrop isOpen={isMobile && drawer} onOpenChange={setDrawer}>
         <Drawer.Content placement="left">
-          <Drawer.Dialog aria-label="作品列表" className="easel-drawer">
+          <Drawer.Dialog aria-label={t("app.workList")} className="easel-drawer">
             {list}
           </Drawer.Dialog>
         </Drawer.Content>
@@ -342,7 +347,7 @@ function WorkName({work}: {work: WorkMeta}) {
   return (
     <input
       className="easel-name"
-      aria-label="作品名称"
+      aria-label={t("app.workName")}
       value={value}
       maxLength={120}
       spellCheck={false}
@@ -376,20 +381,20 @@ function RenameDialog({work, onClose}: {work: WorkMeta | null; onClose: () => vo
             }}
           >
             <Modal.Header>
-              <Modal.Heading>重命名</Modal.Heading>
+              <Modal.Heading>{t("common.rename")}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <TextField aria-label="作品名称" value={name} onChange={setName} autoFocus>
-                <Label className="sr-only">作品名称</Label>
+              <TextField aria-label={t("app.workName")} value={name} onChange={setName} autoFocus>
+                <Label className="sr-only">{t("app.workName")}</Label>
                 <Input maxLength={120} />
               </TextField>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="tertiary" onPress={onClose}>
-                取消
+                {t("common.cancel")}
               </Button>
               <Button type="submit" variant="primary" isDisabled={!name.trim()}>
-                保存
+                {t("common.save")}
               </Button>
             </Modal.Footer>
           </form>
@@ -420,29 +425,29 @@ function ConfirmDialog({confirm, onClose}: {confirm: Confirm; onClose: () => voi
   };
   const body =
     kind === "sync-off"
-      ? "作品会留在这台设备上，云端副本将被移除，其他设备不能再打开它。"
+      ? t("confirm.syncOffBody")
       : status === "local"
-        ? "这件作品只保存在这台设备上，删除后无法恢复。"
+        ? t("confirm.deleteLocal")
         : status === "remote"
-          ? "云端副本将被删除，所有设备都不能再打开它。"
-          : "这台设备和云端的副本都会删除，无法恢复。";
+          ? t("confirm.deleteRemote")
+          : t("confirm.deleteBoth");
   return (
     <AlertDialog.Backdrop isOpen={confirm !== null} onOpenChange={(isOpen) => !isOpen && !pending && onClose()}>
       <AlertDialog.Container>
         <AlertDialog.Dialog className="sm:max-w-[400px]">
           <AlertDialog.Header>
             <AlertDialog.Icon status={kind === "delete" ? "danger" : "warning"} />
-            <AlertDialog.Heading>{kind === "delete" ? `删除「${work.name}」？` : `关闭「${work.name}」的云同步？`}</AlertDialog.Heading>
+            <AlertDialog.Heading>{kind === "delete" ? t("confirm.deleteTitle", {name: work.name}) : t("confirm.syncOffTitle", {name: work.name})}</AlertDialog.Heading>
           </AlertDialog.Header>
           <AlertDialog.Body>
             <p>{body}</p>
           </AlertDialog.Body>
           <AlertDialog.Footer>
             <Button variant="tertiary" isDisabled={pending} onPress={onClose}>
-              取消
+              {t("common.cancel")}
             </Button>
             <Button variant={kind === "delete" ? "danger" : "primary"} isPending={pending} onPress={() => void run()}>
-              {kind === "delete" ? "删除" : "关闭同步"}
+              {kind === "delete" ? t("common.delete") : t("confirm.syncOff")}
             </Button>
           </AlertDialog.Footer>
         </AlertDialog.Dialog>
