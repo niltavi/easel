@@ -104,7 +104,7 @@ function AiForm({isOpen, isMobile, pending, error, quota, objectCount, onSubmit,
       {!text && !blocked && (
         <div className="flex flex-wrap gap-1.5">
           {SUGGESTIONS.slice(objectCount > 0 ? 1 : 0, objectCount > 0 ? 3 : 1).map((suggestion) => (
-            <Button key={suggestion} size="sm" variant="tertiary" onPress={() => setPrompt(suggestion)}>
+            <Button key={suggestion} size="sm" variant="tertiary" className="h-auto min-h-8 max-w-full py-1.5 text-start whitespace-normal" onPress={() => setPrompt(suggestion)}>
               {suggestion}
             </Button>
           ))}
