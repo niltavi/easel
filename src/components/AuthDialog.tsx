@@ -1,4 +1,4 @@
-import {Button, Description, FieldError, Form, Input, InputOTP, Label, Modal, TextField} from "@heroui/react";
+import {Button, Description, Form, Input, InputOTP, Label, Modal, TextField} from "@heroui/react";
 import {useEffect, useState} from "react";
 import {ApiError} from "../lib/api.ts";
 import {t} from "../lib/i18n.ts";
@@ -83,7 +83,8 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
           <Modal.CloseTrigger />
           <Modal.Header>
             <Modal.Heading>{step === "email" ? t("auth.title") : t("auth.codeTitle")}</Modal.Heading>
-            <p className="mt-1.5 text-sm leading-6 text-muted">
+            {/* A long address has no break opportunities of its own; without this it runs past the dialog and is cut off. */}
+            <p className="mt-1.5 text-sm leading-6 wrap-anywhere text-muted">
               {step === "email" ? (reason ?? t("auth.intro")) : t("auth.codeSent", {email: email.trim()})}
             </p>
           </Modal.Header>
@@ -96,10 +97,11 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                   void send();
                 }}
               >
-                <TextField isRequired name="email" type="email" value={email} onChange={setEmail} isInvalid={error !== ""} autoFocus>
+                {/* A failed send is not an invalid email: marking the field invalid would fail the browser's own validation and block every retry. */}
+                <TextField isRequired name="email" type="email" value={email} onChange={setEmail} autoFocus>
                   <Label>{t("auth.email")}</Label>
                   <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
-                  {error ? <FieldError>{error}</FieldError> : null}
+                  {error ? <p className="field-error" data-visible role="alert">{error}</p> : null}
                 </TextField>
                 <Button type="submit" variant="primary" isPending={pending} className="w-full">
                   {t("auth.getCode")}
@@ -128,16 +130,18 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
                       ))}
                     </InputOTP.Group>
                   </InputOTP>
-                  {error ? <p className="text-sm text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
+                  {/* Same type size as the hint it replaces, so the dialog keeps its height when a code is rejected. */}
+                  {error ? <p className="text-xs text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
                 </div>
                 <Button type="submit" variant="primary" isPending={pending} isDisabled={code.length !== 6} className="w-full">
                   {t("common.signIn")}
                 </Button>
+                {/* No negative margins here: the dialog body is a scroll container, so anything past its edge shows a horizontal scrollbar. */}
                 <div className="flex items-center justify-between gap-2">
-                  <Button size="sm" variant="ghost" className="-ms-2.5" onPress={() => { setStep("email"); setError(""); }}>
+                  <Button size="sm" variant="ghost" onPress={() => { setStep("email"); setError(""); }}>
                     {t("auth.changeEmail")}
                   </Button>
-                  <Button size="sm" variant="ghost" className="-me-2.5" isDisabled={wait > 0 || pending} onPress={() => void send()}>
+                  <Button size="sm" variant="ghost" className="tabular-nums" isDisabled={wait > 0 || pending} onPress={() => void send()}>
                     {wait > 0 ? t("auth.resendIn", {seconds: wait}) : t("auth.resend")}
                   </Button>
                 </div>
