@@ -1,5 +1,5 @@
 import {locale, t} from "./i18n.ts";
-import type {AiRequest, AiResponse, ErrorBody, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../../shared/api.ts";
+import type {AiRequest, AuthConfig, AiResponse, ErrorBody, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../../shared/api.ts";
 
 export class ApiError extends Error {
   readonly code: ErrorCode | "network" | "aborted";
@@ -51,6 +51,9 @@ async function request<T>(method: string, path: string, {token, body, signal}: O
 }
 
 export const api = {
+  authConfig: () => request<AuthConfig>("GET", "/auth/config"),
+  register: (email: string, password: string) => request<{token: string; user: User}>("POST", "/auth/register", {body: {email, password}}),
+  login: (email: string, password: string) => request<{token: string; user: User}>("POST", "/auth/login", {body: {email, password}}),
   requestCode: (email: string) => request<{ok: true}>("POST", "/auth/request", {body: {email}}),
   verifyCode: (email: string, code: string) => request<{token: string; user: User}>("POST", "/auth/verify", {body: {email, code}}),
   signOut: (token: string) => request<{ok: true}>("POST", "/auth/signout", {token}),

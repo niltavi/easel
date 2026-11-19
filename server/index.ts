@@ -13,6 +13,9 @@ const port = Number(env.PORT ?? 8787);
 const dbPath = resolve(env.EASEL_DB ?? "data/easel.db");
 mkdirSync(dirname(dbPath), {recursive: true});
 
+const selfHosted = env.EASEL_SELF_HOSTED === "1";
+if (selfHosted) console.log("[easel] self-hosted mode: sign-in uses email and password, and no email is sent");
+
 let ai: AiProvider | null = null;
 if (env.EASEL_AI_MOCK === "1") ai = mockProvider;
 else if (env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN) ai = createClaudeProvider(env);
@@ -23,6 +26,7 @@ const api = createApp({
   mailer: createMailer(env),
   ai,
   dailyQuota: Number(env.EASEL_AI_DAILY_QUOTA ?? 5),
+  selfHosted,
 });
 
 const server = new Hono();

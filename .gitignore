@@ -6,3 +6,4 @@ public/fonts
 data
 *.local
 .DS_Store
+build
