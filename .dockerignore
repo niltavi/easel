@@ -1,0 +1,12 @@
+.git
+.claude
+node_modules
+dist
+dev-dist
+build
+public/fonts
+data
+docs
+.env
+*.local
+.DS_Store
