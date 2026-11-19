@@ -2,51 +2,36 @@
 
 [简体中文](docs/README.zh-CN.md)
 
-Easel is a personal whiteboard that works offline. Handwriting, text, shapes, and connectors share one infinite canvas. Works are saved on the device by default. Cloud sync can be turned on for each work, and AI can draw a flowchart or edit an existing one. The interface is in Simplified Chinese.
+An offline-first personal whiteboard in the Niltavi product family. Handwriting, text, shapes, and connectors share one infinite canvas. Works stay on the device by default; cloud sync is enabled per work, and AI can draw or edit a flowchart with a preview before the change is applied. Easel installs as a PWA and keeps working without a network.
 
-## Run locally
+## Get started
 
-Use Node.js 24 or later and pnpm.
+`pnpm build` writes the web app to `dist/`, and `pnpm server` serves it together with the API from one process. The server stores accounts and synced works in SQLite at `data/easel.db`. Sign-in uses an email code.
+
+Copy `.env.example` to `.env` to configure the server. SMTP settings deliver sign-in codes; without them, the code is printed in the server log. `ANTHROPIC_API_KEY` enables AI. Drawing, managing works, and importing or exporting `.easel` files do not need the server.
+
+## Development
+
+Requirements: Node.js 24 and pnpm. Install dependencies and run the checks:
 
 ```sh
 pnpm install
-pnpm dev:server   # API, http://localhost:8787 by default
-pnpm dev          # web app, proxies /api to the server above
-```
-
-`pnpm dev` alone is enough for drawing, managing works, and importing or exporting files. Sign-in, cloud sync, and AI need the server. Set `EASEL_API` to point the dev proxy at a server on another address.
-
-See `.env.example` for server settings. Without SMTP settings, the sign-in code is printed in the server log. Without `ANTHROPIC_API_KEY`, AI is unavailable; set `EASEL_AI_MOCK=1` for a local demo that returns a fixed sample edit.
-
-## Build and deploy
-
-```sh
-pnpm build        # type-check and write dist/, including the service worker
-pnpm server       # one process serves the API and the web app in dist/
-```
-
-Data is stored in `data/easel.db` (SQLite).
-
-## Test
-
-```sh
 pnpm test
+pnpm build
 ```
 
-The tests cover diagram operation validation, the `.easel` file format, stroke width levels, and the quota and failure handling of the AI endpoint. Sync tests run against a real server: conflicts between two devices, retry after a lost response, deletion in the cloud, expired sessions, sign-out, and switching accounts.
+Developers start their own local servers: `pnpm dev:server` for the API and `pnpm dev` for the web app, which proxies `/api` to `EASEL_API` (`http://localhost:8787` by default). Set `EASEL_AI_MOCK=1` to try AI edits without a model key.
 
-## Code layout
+## Project layout
 
-| Directory | Contents |
+| Directory | Purpose |
 | --- | --- |
-| `shared/` | API contracts, diagram types, and operation validation used by both the browser and the server |
-| `src/lib/` | Local data layer: IndexedDB, works, `.easel` files, sign-in, and sync. It does not depend on the UI library |
-| `src/editor/` | The canvas. `adapter.ts` converts between Excalidraw data and Easel's own data |
-| `src/components/` | The interface, built on HeroUI v3 and the Niltavi theme. `src/theme/` is copied from [niltavi-ui](https://github.com/niltavi/niltavi-ui); do not edit it here |
-| `server/` | Hono API: sign-in by email code, work snapshots, and AI previews |
+| `src/components/` | Interface, built on HeroUI v3 and the Niltavi theme |
+| `src/editor/` | Canvas; `adapter.ts` converts between Excalidraw and Easel data |
+| `src/lib/` | Local data layer: IndexedDB, works, `.easel` files, sign-in, and sync |
+| `src/theme/` | Theme copied from [niltavi-ui](https://github.com/niltavi/niltavi-ui); do not edit it here |
+| `shared/` | API contracts, diagram types, and operation validation for browser and server |
+| `server/` | Hono API: email-code sign-in, work snapshots, and AI previews |
+| `tests/` | Diagram validation, file format, AI quota, and sync against a real server |
 
-## Sync model
-
-The cloud keeps a full, versioned snapshot of each work. A push names the version that the local content is based on, and the server accepts it only if that version is the latest. The device that pushes late receives a conflict. It saves its own changes as a conflict copy and then pulls the cloud version.
-
-Each push carries a mutation ID in the form `device:revision`, so retrying the same content does not create a new version. Deleting the cloud copy leaves a record without content. A later push from an offline device then gets a clear "removed" response, and its unsent changes become a local copy.
+The product interface currently uses Chinese. Active development takes place in `niltavi/easel` on [GitHub](https://github.com/niltavi/easel) and [Gitea](https://git.yarinz.com/niltavi/easel).
