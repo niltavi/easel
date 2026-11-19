@@ -1,0 +1,8 @@
+node_modules
+dist
+dev-dist
+public/fonts
+.env
+data
+*.local
+.DS_Store
