@@ -1,13 +1,14 @@
 import {useSyncExternalStore} from "react";
 
-export type Theme = "light" | "dark";
+import {preferredTheme, saveTheme, type ProductTheme} from "../vendor/niltavi-ui/theme.ts";
 
-export function useTheme(): Theme {
+export function useTheme(): ProductTheme {
   return useSyncExternalStore(subscribe, theme);
 }
 
-function theme(): Theme {
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+function theme(): ProductTheme {
+  const current = document.documentElement.dataset.theme;
+  return current === "dark" || current === "light" ? current : preferredTheme();
 }
 
 function subscribe(listener: () => void) {
@@ -17,11 +18,5 @@ function subscribe(listener: () => void) {
 }
 
 export function toggleTheme() {
-  const next = theme() === "light" ? "dark" : "light";
-  try {
-    localStorage.setItem("easel.theme", next);
-  } catch {
-    // Theme still applies to this page if storage is disabled.
-  }
-  document.documentElement.dataset.theme = next;
+  saveTheme(theme() === "light" ? "dark" : "light");
 }

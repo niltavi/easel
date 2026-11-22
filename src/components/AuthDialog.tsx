@@ -4,6 +4,7 @@ import {api, ApiError} from "../lib/api.ts";
 import {t} from "../lib/i18n.ts";
 import {register, requestCode, signInWithPassword, verifyCode} from "../lib/sync.ts";
 import {pageHref, type Locale} from "../site/routes.ts";
+import {EmailPasswordForm} from "../vendor/niltavi-ui/EmailPasswordForm.tsx";
 
 interface AuthFormProps {
   reason?: string;
@@ -149,6 +150,34 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
     : step === "code" ? t("auth.codeSent", {email: email.trim()})
       : reason ?? (mode === "password" ? t("auth.introPassword") : t("auth.intro"));
 
+  if (mode === "password" && locale) {
+    return (
+      <>
+        <h1 className="sr-only">{heading}</h1>
+        <EmailPasswordForm
+          mode={creating ? "register" : "sign-in"}
+          labels={{
+            title: creating ? t("auth.createAccount") : t("common.signIn"),
+            email: t("auth.email"),
+            password: t("auth.password"),
+            retry: t("auth.errorGeneric"),
+          }}
+          alternate={{href: pageHref(creating ? "login" : "register", locale), label: creating ? t("auth.toSignIn") : t("auth.toRegister")}}
+          onSubmit={async ({email, password}) => {
+            try {
+              await (creating ? register : signInWithPassword)(email, password);
+              onSignedIn();
+            } catch (cause) {
+              return {message: describe(cause)};
+            }
+          }}
+        >
+          <p className="text-sm leading-6 text-muted">{description}</p>
+        </EmailPasswordForm>
+      </>
+    );
+  }
+
   return (
     <section className="flex min-w-0 flex-col gap-4">
       {locale ? <h1 className="text-2xl font-medium">{heading}</h1> : <h2 className="text-xl font-medium">{heading}</h2>}
@@ -158,7 +187,7 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
           ? <div role="alert" className="flex flex-col items-start gap-2">{t("auth.errorNetwork")} <Button size="sm" onPress={() => setAttempt(attempt + 1)}>{t("common.retry")}</Button></div>
           : <div role="status" aria-label={t("app.opening")}><Spinner /></div>
       ) : creating && mode === "code" ? link(false) : mode === "password" || step === "email" ? (
-        <Form className="flex flex-col gap-4" onSubmit={(event) => {
+        <Form method="post" className="flex flex-col gap-4" onSubmit={(event) => {
           event.preventDefault();
           void (mode === "password" ? submitPassword() : send());
         }}>
@@ -180,7 +209,7 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
           {(mode === "password" || locale) && link(!creating)}
         </Form>
       ) : (
-        <Form className="flex flex-col gap-4" onSubmit={(event) => {
+        <Form method="post" className="flex flex-col gap-4" onSubmit={(event) => {
           event.preventDefault();
           if (code.length === 6) void verify(code);
         }}>

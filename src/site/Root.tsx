@@ -1,11 +1,12 @@
-import {Globe, LogoGithub, Moon, Sun} from "@gravity-ui/icons";
-import {Button, Dropdown, Label, Spinner} from "@heroui/react";
+import {Button, Spinner} from "@heroui/react";
 import {buttonVariants} from "@heroui/styles";
 import {useEffect, useRef, useState} from "react";
 import {selectLocale, t} from "../lib/i18n.ts";
 import {editor} from "../lib/state.ts";
 import {siteCopy} from "./content.ts";
 import {pageHref, publicOrigin, repository, route, type Locale} from "./routes.ts";
+import {ProductFooter, ProductHeader} from "../vendor/niltavi-ui/ProductHeader.tsx";
+import {applyTheme, preferredTheme, systemDarkQuery} from "../vendor/niltavi-ui/theme.ts";
 import {toggleTheme, useTheme} from "./theme.ts";
 
 const loadApp = () => import("../components/App.tsx");
@@ -18,36 +19,21 @@ function Header({url}: {url: URL}) {
   const theme = useTheme();
   const brand = page === "app" ? "app" : "home";
   return (
-    <header className="site-header">
-      <div className="site-container site-header-inner" data-wide={page === "app" || undefined}>
-        <a className="site-brand" href={pageHref(brand, locale)}>
-          <img src="/favicon.svg" width={40} height={40} alt="" />
-          <span>Easel</span>
-        </a>
-        <nav className="site-controls">
-          {page === "home" && <a className={buttonVariants({size: "sm", variant: "secondary"})} href={pageHref("login", locale)}>{copy.signIn}</a>}
-          <Button data-header-icon="" isIconOnly size="sm" variant="ghost" aria-label={theme === "light" ? copy.dark : copy.light} onPress={toggleTheme}>
-            {theme === "light" ? <Moon aria-hidden width={18} height={18} /> : <Sun aria-hidden width={18} height={18} />}
-          </Button>
-          <Dropdown>
-            <Button data-header-icon="" isIconOnly size="sm" variant="ghost" aria-label={copy.language}><Globe aria-hidden width={18} height={18} /></Button>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu aria-label={copy.language} selectionMode="single" disallowEmptySelection selectedKeys={[locale]}
-                onSelectionChange={(keys) => {
-                  const next = [...keys][0];
-                  if ((next === "en" || next === "zh-CN") && next !== locale) navigate(pageHref(page, next) + url.search + url.hash);
-                }}>
-                <Dropdown.Item id="en" textValue="English"><Label lang="en">English</Label><Dropdown.ItemIndicator /></Dropdown.Item>
-                <Dropdown.Item id="zh-CN" textValue="简体中文"><Label lang="zh-CN">简体中文</Label><Dropdown.ItemIndicator /></Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-          <a data-header-icon="" className={buttonVariants({isIconOnly: true, size: "sm", variant: "ghost"})} href={repository} aria-label={copy.github}>
-            <LogoGithub aria-hidden width={18} height={18} />
-          </a>
-        </nav>
-      </div>
-    </header>
+    <ProductHeader
+      variant={page === "app" ? "app" : "site"}
+      brand={{name: "Easel", href: pageHref(brand, locale), symbol: <img src="/favicon.svg" width={40} height={40} alt="" />}}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+      locale={locale}
+      locales={[
+        {locale: "en", label: "English", href: pageHref(page, "en") + url.search + url.hash},
+        {locale: "zh-CN", label: "简体中文", href: pageHref(page, "zh-CN") + url.search + url.hash},
+      ]}
+      onNavigateLocale={(href) => navigate(href)}
+      githubHref={repository}
+      signIn={page === "home" ? {href: pageHref("login", locale), label: copy.signIn} : undefined}
+      labels={copy}
+    />
   );
 }
 
@@ -55,7 +41,7 @@ function Home({locale}: {locale: Locale}) {
   const copy = siteCopy[locale];
   return (
     <>
-      <main className="site-container site-intro">
+      <main className="niltavi-container site-intro">
         <h1>{copy.heading}</h1>
         <p>{copy.description}</p>
         <div className="site-actions">
@@ -63,17 +49,13 @@ function Home({locale}: {locale: Locale}) {
           <a className={buttonVariants({variant: "secondary"})} href="/llms.txt">{copy.install}</a>
         </div>
       </main>
-      <footer className="site-container site-footer">
-        <a href="https://niltavi.com/">
-          <img className="site-wordmark--light" src="/niltavi-logo-light.svg" width={72} height={26} alt="Niltavi" />
-          <img className="site-wordmark--dark" src="/niltavi-logo-dark.svg" width={72} height={26} alt="Niltavi" />
-        </a>
-      </footer>
+      <ProductFooter lightLogo="/niltavi-logo-light.svg" darkLogo="/niltavi-logo-dark.svg" />
     </>
   );
 }
 
 export function navigate(href: string, replace = false) {
+  if (new URL(href, location.href).href === location.href) return;
   if (replace) history.replaceState(null, "", href);
   else history.pushState(null, "", href);
   window.dispatchEvent(new PopStateEvent("popstate"));
@@ -88,6 +70,13 @@ export function Root() {
   const lastNavigation = useRef(0);
   const activePage = useRef(readRoute(url).page);
   const {page, locale} = readRoute(url);
+
+  useEffect(() => {
+    const media = matchMedia(systemDarkQuery);
+    const syncTheme = () => applyTheme(preferredTheme());
+    media.addEventListener("change", syncTheme);
+    return () => media.removeEventListener("change", syncTheme);
+  }, []);
 
   useEffect(() => {
     const update = async () => {
@@ -150,7 +139,7 @@ export function Root() {
         : page !== "app" && AuthPage ? <AuthPage key={page} creating={page === "register"} locale={locale} onSignedIn={() => { const current = readRoute(new URL(location.href)); if (current.page === page) navigate(pageHref("app", current.locale), true); }} />
         : <main className="site-pending" role="status" aria-label={t("app.opening")}>{!failed && <Spinner />}</main>}
       {pending && <span role="status" className="sr-only">{t("app.opening")}</span>}
-      {failed && <div role="alert" className="site-container py-4">{t("api.unavailable")} <Button size="sm" onPress={() => location.reload()}>{t("common.retry")}</Button></div>}
+      {failed && <div role="alert" className="niltavi-container py-4">{t("api.unavailable")} <Button size="sm" onPress={() => location.reload()}>{t("common.retry")}</Button></div>}
     </>
   );
 }

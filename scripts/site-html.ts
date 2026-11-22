@@ -1,39 +1,24 @@
 import type {Plugin} from "vite";
+import {themeInitialization} from "../src/vendor/niltavi-ui/theme.ts";
 import {siteCopy} from "../src/site/content.ts";
 import {locales, pageHref, publicOrigin, repository, route, type Locale} from "../src/site/routes.ts";
-
-const themeScript = `(() => {
-  const media = matchMedia("(prefers-color-scheme: dark)");
-  const apply = () => {
-    let theme;
-    try { theme = localStorage.getItem("easel.theme"); } catch {}
-    document.documentElement.dataset.theme = theme === "light" || theme === "dark"
-      ? theme : media.matches ? "dark" : "light";
-  };
-  apply();
-  media.addEventListener("change", () => {
-    try { if (["light", "dark"].includes(localStorage.getItem("easel.theme"))) return; } catch {}
-    document.documentElement.dataset.theme = media.matches ? "dark" : "light";
-  });
-  window.EXCALIDRAW_ASSET_PATH = "/";
-})();`;
 
 const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
 function home(locale: Locale) {
   const copy = siteCopy[locale];
   const other = locale === "en" ? "zh-CN" : "en";
-  return `<header class="site-header">
-    <div class="site-container site-header-inner">
-      <a class="site-brand" href="${pageHref("home", locale)}"><img src="/favicon.svg" width="40" height="40" alt=""><span>Easel</span></a>
-      <nav class="site-controls">
-        <a href="${pageHref("login", locale)}">${copy.signIn}</a>
+  return `<header class="niltavi-product-header">
+    <div class="niltavi-product-header__inner niltavi-container">
+      <a class="niltavi-project-brand" aria-label="Easel" href="${pageHref("home", locale)}"><span class="niltavi-project-brand__symbol" aria-hidden="true"><img src="/favicon.svg" width="40" height="40" alt=""></span><span class="niltavi-project-brand__name">Easel</span></a>
+      <nav class="niltavi-product-header__actions">
+        <a class="button button--sm button--secondary" href="${pageHref("login", locale)}">${copy.signIn}</a>
         <a lang="${other}" hreflang="${other}" href="${pageHref("home", other)}">${other === "en" ? "English" : "简体中文"}</a>
         <a href="${repository}">GitHub</a>
       </nav>
     </div>
   </header>
-  <main class="site-container site-intro">
+  <main class="niltavi-container site-intro">
     <h1>${copy.heading}</h1>
     <p>${copy.description}</p>
     <div class="site-actions">
@@ -41,8 +26,8 @@ function home(locale: Locale) {
       <a class="button button--secondary" href="/llms.txt">${copy.install}</a>
     </div>
   </main>
-  <footer class="site-container site-footer">
-    <a href="https://niltavi.com/"><img class="site-wordmark--light" src="/niltavi-logo-light.svg" width="72" height="26" alt="Niltavi"><img class="site-wordmark--dark" src="/niltavi-logo-dark.svg" width="72" height="26" alt="Niltavi"></a>
+  <footer class="niltavi-product-footer niltavi-container">
+    <a href="https://niltavi.com/" aria-label="Niltavi"><img class="niltavi-product-footer__light" src="/niltavi-logo-light.svg" width="75" height="28" alt=""><img class="niltavi-product-footer__dark" src="/niltavi-logo-dark.svg" width="75" height="28" alt=""></a>
   </footer>`;
 }
 
@@ -74,7 +59,7 @@ export function siteHtml(): Plugin {
         : '<title>Easel</title><meta name="robots" content="noindex">';
       return html.replace('lang="en"', `lang="${locale}"`)
         .replace("<!-- page-metadata -->", metadata)
-        .replace("<!-- theme-init -->", () => `<script>${themeScript}</script>`)
+        .replace("<!-- theme-init -->", () => `<script>${themeInitialization}window.EXCALIDRAW_ASSET_PATH = "/";</script>`)
         .replace("<!-- static-content -->", () => isHome ? home(locale) : "");
     },
     generateBundle() {
