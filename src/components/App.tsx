@@ -8,8 +8,11 @@ import {Editor, type EditorHandle, type EditorUi} from "../editor/Editor.tsx";
 import {DEFAULT_INK} from "../editor/tools.ts";
 import {api, ApiError} from "../lib/api.ts";
 import {EASEL_EXTENSION, EaselFileError} from "../lib/file.ts";
-import {useAppState, useIsMobile, useTheme} from "../lib/hooks.ts";
-import {localeName, otherLocale, setLocale, t} from "../lib/i18n.ts";
+import {useAppState, useIsMobile} from "../lib/hooks.ts";
+import {t} from "../lib/i18n.ts";
+import {useTheme} from "../site/theme.ts";
+import type {Locale} from "../site/routes.ts";
+import "../index.css";
 import {currentWork, getState, notify, onNotice, setState, ui as uiBridge, visibleWorks} from "../lib/state.ts";
 import {activeSession, disableSync, enableSync, expireSession, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
 import {workStatus, type WorkMeta} from "../lib/types.ts";
@@ -46,7 +49,7 @@ function start() {
 
 type Confirm = {kind: "delete" | "sync-off"; work: WorkMeta} | null;
 
-export function App() {
+export function App({locale}: {locale: Locale}) {
   const state = useAppState();
   const isMobile = useIsMobile();
   const theme = useTheme();
@@ -54,6 +57,8 @@ export function App() {
   const [editorUi, setEditorUi] = useState<EditorUi>(INITIAL_UI);
   const [sidebar, setSidebar] = useState(() => localStorage.getItem(SIDEBAR_KEY) !== "closed");
   const [drawer, setDrawer] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const openingWork = useRef(false);
   const [auth, setAuth] = useState<{open: boolean; reason?: string; then?: () => void}>({open: false});
   const [renaming, setRenaming] = useState<WorkMeta | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -65,6 +70,14 @@ export function App() {
   const getEditor = useCallback(() => editorRef.current, []);
 
   useEffect(start, []);
+
+  useEffect(() => {
+    const preventPageZoom = (event: WheelEvent) => {
+      if (event.ctrlKey && !(event.target as Element | null)?.closest?.(".excalidraw")) event.preventDefault();
+    };
+    window.addEventListener("wheel", preventPageZoom, {passive: false});
+    return () => window.removeEventListener("wheel", preventPageZoom);
+  }, []);
 
   useEffect(
     () =>
@@ -97,7 +110,7 @@ export function App() {
 
   useEffect(() => {
     document.title = work ? `${work.name} · Easel` : "Easel";
-  }, [work?.name]);
+  }, [work?.name, locale]);
 
   // Switched to another work: the AI panel and any in-flight request no longer apply.
   useEffect(() => {
@@ -114,7 +127,15 @@ export function App() {
   };
 
   const open = async (id: string) => {
-    if (await openWork(id)) setDrawer(false);
+    if (openingWork.current) return;
+    openingWork.current = true;
+    setOpening(true);
+    try {
+      if (await openWork(id)) setDrawer(false);
+    } finally {
+      openingWork.current = false;
+      setOpening(false);
+    }
   };
 
   const exportFile = async (target: WorkMeta) => {
@@ -208,14 +229,6 @@ export function App() {
     }
   };
 
-  if (state.phase === "loading" || !work) {
-    return (
-      <div className="easel-loading" role="status" aria-label={t("app.opening")}>
-        <Spinner />
-      </div>
-    );
-  }
-
   const list = (
     <WorkList
       works={works}
@@ -234,80 +247,83 @@ export function App() {
     <div className="easel" data-sidebar={!isMobile && sidebar ? "open" : "closed"}>
       {!isMobile && sidebar && <aside className="easel-side">{list}</aside>}
       <main className="easel-main">
-        <header className="easel-top">
-          <Tooltip delay={500}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label={isMobile ? t("app.openWorkList") : sidebar ? t("app.collapseWorkList") : t("app.expandWorkList")} aria-expanded={isMobile ? drawer : sidebar} onPress={toggleSidebar}>
-              {isMobile ? <Bars aria-hidden /> : <LayoutSideContentLeft aria-hidden />}
-            </Button>
-            <Tooltip.Content placement="bottom">{t("app.workList")}</Tooltip.Content>
-          </Tooltip>
-          <WorkName key={work.id} work={work} />
-          <div className="easel-top__state" aria-live="polite">
-            {state.save === "failed" ? (
-              <span className="easel-status" data-status="failed">{t("status.saveFailed")}</span>
-            ) : state.save === "saving" ? (
-              <span className="easel-status">{t("status.saving")}</span>
-            ) : (
-              <StatusLine work={work} compact />
-            )}
-            {!state.online && (
-              <span className="easel-status" title={t("status.offline")}>
-                <CloudSlash aria-hidden width={12} height={12} />
-                <span className="easel-top__wide">{t("status.offline")}</span>
-              </span>
-            )}
-          </div>
-          <span className="ms-auto" />
-          <Tooltip delay={500}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.fitLabel")} onPress={() => editorRef.current?.fit()}>
-              <ArrowsExpand aria-hidden />
-            </Button>
-            <Tooltip.Content placement="bottom">{t("app.fit")}</Tooltip.Content>
-          </Tooltip>
-          <Dropdown>
-            <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.workMenu")}>
-              <Ellipsis aria-hidden />
-            </Button>
-            <Dropdown.Popover placement="bottom end">
-              <Dropdown.Menu
-                onAction={(key) => {
-                  if (key === "ai") openAi();
-                  else if (key === "png") void editorRef.current?.exportPng();
-                  else if (key === "import") void importFile();
-                  else if (key === "language") setLocale(otherLocale);
-                  else onAction(key as WorkAction, work);
-                }}
-              >
-                <Dropdown.Item id="ai" textValue={t("ai.title")}>
-                  <Label>{t("ai.title")}</Label>
-                </Dropdown.Item>
-                <Dropdown.Item id="png" textValue={t("common.exportPng")}>
-                  <Label>{t("common.exportPng")}</Label>
-                </Dropdown.Item>
-                <Dropdown.Item id="import" textValue={t("common.importFile")}>
-                  <Label>{t("common.importFile")}</Label>
-                </Dropdown.Item>
-                <WorkMenuItems work={work} />
-                <Dropdown.Item id="language" textValue={localeName(otherLocale)}>
-                  <Label lang={otherLocale}>{localeName(otherLocale)}</Label>
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-        </header>
-        <div className="easel-stage">
-          <Editor ref={editorRef} workId={work.id} nonce={state.loadNonce} theme={theme} onUi={setEditorUi} />
-          <div className="easel-dock">
-            {editorUi.preview ? (
-              <PreviewBar summary={editorUi.preview} onApply={() => void editorRef.current?.applyPreview()} onCancel={() => editorRef.current?.cancelPreview()} />
-            ) : (
-              <>
-                <AiPanel isOpen={ai.open} isMobile={isMobile} pending={ai.pending} error={ai.error} quota={state.quota} objectCount={ai.count} onSubmit={(prompt) => void submitAi(prompt)} onClose={closeAi} />
-                {!(ai.open && !isMobile) && <EditorToolbar ui={editorUi} editor={getEditor} onAi={openAi} />}
-              </>
-            )}
-          </div>
-        </div>
+        {state.phase === "ready" && work ? (
+          <>
+            <header className="easel-top">
+              <Tooltip delay={500}>
+                <Button isIconOnly size="sm" variant="ghost" aria-label={isMobile ? t("app.openWorkList") : sidebar ? t("app.collapseWorkList") : t("app.expandWorkList")} aria-expanded={isMobile ? drawer : sidebar} onPress={toggleSidebar}>
+                  {isMobile ? <Bars aria-hidden /> : <LayoutSideContentLeft aria-hidden />}
+                </Button>
+                <Tooltip.Content placement="bottom">{t("app.workList")}</Tooltip.Content>
+              </Tooltip>
+              <WorkName key={work.id} work={work} />
+              <div className="easel-top__state" aria-live="polite">
+                {state.save === "failed" ? (
+                  <span className="easel-status" data-status="failed">{t("status.saveFailed")}</span>
+                ) : state.save === "saving" ? (
+                  <span className="easel-status">{t("status.saving")}</span>
+                ) : (
+                  <StatusLine work={work} compact />
+                )}
+                {!state.online && (
+                  <span className="easel-status" title={t("status.offline")}>
+                    <CloudSlash aria-hidden width={12} height={12} />
+                    <span className="easel-top__wide">{t("status.offline")}</span>
+                  </span>
+                )}
+              </div>
+              <span className="ms-auto" />
+              <Tooltip delay={500}>
+                <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.fitLabel")} onPress={() => editorRef.current?.fit()}>
+                  <ArrowsExpand aria-hidden />
+                </Button>
+                <Tooltip.Content placement="bottom">{t("app.fit")}</Tooltip.Content>
+              </Tooltip>
+              <Dropdown>
+                <Button isIconOnly size="sm" variant="ghost" aria-label={t("app.workMenu")}>
+                  <Ellipsis aria-hidden />
+                </Button>
+                <Dropdown.Popover placement="bottom end">
+                  <Dropdown.Menu
+                    onAction={(key) => {
+                      if (key === "ai") openAi();
+                      else if (key === "png") void editorRef.current?.exportPng();
+                      else if (key === "import") void importFile();
+                      else onAction(key as WorkAction, work);
+                    }}
+                  >
+                    <Dropdown.Item id="ai" textValue={t("ai.title")}>
+                      <Label>{t("ai.title")}</Label>
+                    </Dropdown.Item>
+                    <Dropdown.Item id="png" textValue={t("common.exportPng")}>
+                      <Label>{t("common.exportPng")}</Label>
+                    </Dropdown.Item>
+                    <Dropdown.Item id="import" textValue={t("common.importFile")}>
+                      <Label>{t("common.importFile")}</Label>
+                    </Dropdown.Item>
+                    <WorkMenuItems work={work} />
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            </header>
+            <div className="easel-stage" aria-busy={opening}>
+              {opening && <div className="easel-opening" role="status" aria-label={t("app.opening")}><Spinner size="sm" /></div>}
+              <Editor ref={editorRef} workId={work.id} nonce={state.loadNonce} theme={theme} onUi={setEditorUi} />
+              <div className="easel-dock">
+                {editorUi.preview ? (
+                  <PreviewBar summary={editorUi.preview} onApply={() => void editorRef.current?.applyPreview()} onCancel={() => editorRef.current?.cancelPreview()} />
+                ) : (
+                  <>
+                    <AiPanel isOpen={ai.open} isMobile={isMobile} pending={ai.pending} error={ai.error} quota={state.quota} objectCount={ai.count} onSubmit={(prompt) => void submitAi(prompt)} onClose={closeAi} />
+                    {!(ai.open && !isMobile) && <EditorToolbar ui={editorUi} editor={getEditor} onAi={openAi} />}
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="site-pending" role="status" aria-label={t("app.opening")}><Spinner /></div>
+        )}
       </main>
 
       <Drawer.Backdrop isOpen={isMobile && drawer} onOpenChange={setDrawer}>

@@ -7,6 +7,7 @@ export type Mailer = (email: string, code: string, lang: Lang) => Promise<void>;
 export function createMailer(env: NodeJS.ProcessEnv): Mailer {
   const url = env.EASEL_SMTP_URL;
   if (!url) {
+    if (env.NODE_ENV === "production") return async () => { throw new Error("Verification email requires EASEL_SMTP_URL"); };
     return async (email, code) => {
       console.log(`[easel] sign-in verification code for ${email}: ${code} (EASEL_SMTP_URL is not configured, printing only)`);
     };

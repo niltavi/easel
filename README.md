@@ -29,10 +29,11 @@ AI can draw a flowchart from a description or edit the one on the canvas. It sho
 <br />
 
 <div>
+<a href="docs/en/for-agents.md">For Agents</a>
 <a href="https://niltavi.com/">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/niltavi-logo-dark.svg" />
-  <img align="right" src="docs/assets/niltavi-logo-light.svg" width="72" height="26" alt="niltavi" />
+  <source media="(prefers-color-scheme: dark)" srcset="public/niltavi-logo-dark.svg" />
+  <img align="right" src="public/niltavi-logo-light.svg" width="72" height="26" alt="niltavi" />
 </picture>
 </a>
 </div>

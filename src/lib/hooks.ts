@@ -18,4 +18,3 @@ function useMediaQuery(query: string): boolean {
 }
 
 export const useIsMobile = () => useMediaQuery("(max-width: 767px)");
-export const useTheme = (): "light" | "dark" => (useMediaQuery("(prefers-color-scheme: dark)") ? "dark" : "light");

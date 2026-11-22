@@ -5,7 +5,7 @@ import {api, ApiError} from "./api.ts";
 import * as store from "./db.ts";
 import {EaselFileError, parseDocument, serializeDocument} from "./file.ts";
 import {t} from "./i18n.ts";
-import {editor, getState, notify, setState, ui} from "./state.ts";
+import {canOpenWork, editor, getState, notify, setState, ui} from "./state.ts";
 import type {Session, WorkMeta} from "./types.ts";
 import {ensureCurrent, newId, openLocalWork, pendingDeletes, refreshWorks, setPendingDeletes} from "./works.ts";
 
@@ -30,9 +30,6 @@ function activeSession(): Session | null {
 // ---------- Sign-in ----------
 
 export const requestCode = (email: string) => api.requestCode(email);
-
-/** How the server signs people in. An unreachable server is treated as the default, an emailed code. */
-export const authMode = () => api.authConfig().then((config) => config.signIn, () => "code" as const);
 
 export const verifyCode = async (email: string, code: string) => adopt(await api.verifyCode(email, code));
 export const register = async (email: string, password: string) => adopt(await api.register(email, password));
@@ -327,7 +324,7 @@ async function download(session: Session, id: string): Promise<boolean> {
 /** Open a work; download it first if it hasn't been downloaded yet. */
 export async function openWork(id: string): Promise<boolean> {
   const work = getState().works.find((item) => item.id === id);
-  if (!work) return false;
+  if (!work || !canOpenWork(work)) return false;
   if (work.cloud && !work.cloud.downloaded) {
     const session = activeSession();
     if (!session || !getState().online) {

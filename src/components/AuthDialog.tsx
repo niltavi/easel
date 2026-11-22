@@ -1,16 +1,22 @@
-import {Button, Description, Form, Input, InputOTP, Label, Modal, TextField} from "@heroui/react";
+import {Button, Description, Form, Input, InputOTP, Label, Modal, Spinner, TextField} from "@heroui/react";
 import {useEffect, useState} from "react";
-import {ApiError} from "../lib/api.ts";
+import {api, ApiError} from "../lib/api.ts";
 import {t} from "../lib/i18n.ts";
-import {authMode, register, requestCode, signInWithPassword, verifyCode} from "../lib/sync.ts";
+import {register, requestCode, signInWithPassword, verifyCode} from "../lib/sync.ts";
+import {pageHref, type Locale} from "../site/routes.ts";
 
-interface Props {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Why sign-in was opened; shown below the heading. */
+interface AuthFormProps {
   reason?: string;
   defaultEmail?: string;
+  creating: boolean;
+  locale?: Locale;
+  onSwitch?: () => void;
   onSignedIn: () => void;
+}
+
+interface DialogProps extends Pick<AuthFormProps, "reason" | "defaultEmail" | "onSignedIn"> {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 const RESEND_SECONDS = 60;
@@ -20,10 +26,35 @@ function describe(error: unknown): string {
   return t("auth.errorGeneric");
 }
 
-export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onSignedIn}: Props) {
-  // "code" is the default flow; a self-hosted server reports "password" and the dialog switches to it.
-  const [mode, setMode] = useState<"code" | "password">("code");
+export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail, onSignedIn}: DialogProps) {
   const [creating, setCreating] = useState(false);
+  const change = (open: boolean) => {
+    if (!open) setCreating(false);
+    onOpenChange(open);
+  };
+  return (
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={change}>
+      <Modal.Container placement="auto">
+        <Modal.Dialog className="sm:max-w-sm" aria-label={creating ? t("auth.registerTitle") : t("auth.title")}>
+          <Modal.CloseTrigger />
+          <Modal.Body className="pt-9">
+            {isOpen && <AuthForm reason={reason} defaultEmail={defaultEmail} creating={creating}
+              onSwitch={() => setCreating(!creating)} onSignedIn={() => { change(false); onSignedIn(); }} />}
+          </Modal.Body>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
+
+export function AuthPage(props: AuthFormProps) {
+  return <main className="site-auth"><AuthForm {...props} /></main>;
+}
+
+function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSignedIn}: AuthFormProps) {
+  const [mode, setMode] = useState<"code" | "password">();
+  const [configError, setConfigError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState(defaultEmail);
@@ -33,19 +64,15 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
   const [wait, setWait] = useState(0);
 
   useEffect(() => {
-    if (!isOpen) return;
-    setStep("email");
-    setEmail(defaultEmail);
-    setCode("");
-    setError("");
-    setPassword("");
-    setCreating(false);
     let current = true;
-    void authMode().then((value) => current && setMode(value));
-    return () => {
-      current = false;
-    };
-  }, [isOpen, defaultEmail]);
+    setConfigError(false);
+    void api.authConfig().then(({signIn}) => {
+      if (current) setMode(signIn);
+    }, () => {
+      if (current) setConfigError(true);
+    });
+    return () => { current = false; };
+  }, [attempt]);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -54,6 +81,7 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
   }, [wait]);
 
   const send = async () => {
+    if (pending) return;
     setPending(true);
     setError("");
     try {
@@ -63,7 +91,6 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
       setWait(RESEND_SECONDS);
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === "rate_limited") {
-        // A code was already sent within the last minute: let the user go straight to entering it.
         setStep("code");
         setWait(RESEND_SECONDS);
       } else setError(describe(cause));
@@ -72,18 +99,17 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
     }
   };
 
-  // Editing a field clears the message from the last attempt.
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value);
     setError("");
   };
 
   const submitPassword = async () => {
+    if (pending) return;
     setPending(true);
     setError("");
     try {
       await (creating ? register : signInWithPassword)(email.trim(), password);
-      onOpenChange(false);
       onSignedIn();
     } catch (cause) {
       setError(describe(cause));
@@ -93,11 +119,11 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
   };
 
   const verify = async (value: string) => {
+    if (pending) return;
     setPending(true);
     setError("");
     try {
       await verifyCode(email.trim(), value);
-      onOpenChange(false);
       onSignedIn();
     } catch (cause) {
       setError(describe(cause));
@@ -107,112 +133,75 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
     }
   };
 
+  const link = (toRegister: boolean) => {
+    const label = toRegister ? t("auth.toRegister") : t("auth.toSignIn");
+    if (locale) return <a className="self-start text-sm underline underline-offset-4" href={pageHref(toRegister ? "register" : "login", locale)}>{label}</a>;
+    if (onSwitch) return <Button size="sm" variant="ghost" className="self-start" isDisabled={pending} onPress={() => {
+      setPassword("");
+      setError("");
+      onSwitch();
+    }}>{label}</Button>;
+  };
+
+  const heading = creating ? t("auth.registerTitle") : step === "code" ? t("auth.codeTitle") : t("auth.title");
+  const description = creating
+    ? mode === "code" ? t("auth.hostedRegistration") : t("auth.introRegister")
+    : step === "code" ? t("auth.codeSent", {email: email.trim()})
+      : reason ?? (mode === "password" ? t("auth.introPassword") : t("auth.intro"));
+
   return (
-    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container placement="auto">
-        <Modal.Dialog className="sm:max-w-sm">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Heading>
-              {mode === "password" ? (creating ? t("auth.registerTitle") : t("auth.title")) : step === "email" ? t("auth.title") : t("auth.codeTitle")}
-            </Modal.Heading>
-            {/* A long address has no break opportunities of its own; without this it runs past the dialog and is cut off. */}
-            <p className="mt-1.5 text-sm leading-6 wrap-anywhere text-muted">
-              {mode === "password"
-                ? creating
-                  ? t("auth.introRegister")
-                  : (reason ?? t("auth.introPassword"))
-                : step === "email"
-                  ? (reason ?? t("auth.intro"))
-                  : t("auth.codeSent", {email: email.trim()})}
-            </p>
-          </Modal.Header>
-          <Modal.Body>
-            {mode === "password" ? (
-              <Form
-                className="flex flex-col gap-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void submitPassword();
-                }}
-              >
-                <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
-                  <Label>{t("auth.email")}</Label>
-                  <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
-                </TextField>
-                <TextField isRequired name="password" type="password" value={password} onChange={edit(setPassword)} minLength={creating ? 8 : undefined} maxLength={128}>
-                  <Label>{t("auth.password")}</Label>
-                  <Input autoComplete={creating ? "new-password" : "current-password"} />
-                  {error ? <p className="field-error" data-visible role="alert">{error}</p> : creating ? <Description>{t("auth.passwordHint")}</Description> : null}
-                </TextField>
-                <Button type="submit" variant="primary" isPending={pending} className="w-full">
-                  {creating ? t("auth.createAccount") : t("common.signIn")}
-                </Button>
-                <Button size="sm" variant="ghost" className="self-start" onPress={() => { setCreating(!creating); setError(""); }}>
-                  {creating ? t("auth.toSignIn") : t("auth.toRegister")}
-                </Button>
-              </Form>
-            ) : step === "email" ? (
-              <Form
-                className="flex flex-col gap-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void send();
-                }}
-              >
-                {/* A failed send is not an invalid email: marking the field invalid would fail the browser's own validation and block every retry. */}
-                <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
-                  <Label>{t("auth.email")}</Label>
-                  <Input placeholder="name@example.com" autoComplete="email" inputMode="email" />
-                  {error ? <p className="field-error" data-visible role="alert">{error}</p> : null}
-                </TextField>
-                <Button type="submit" variant="primary" isPending={pending} className="w-full">
-                  {t("auth.getCode")}
-                </Button>
-              </Form>
-            ) : (
-              <Form
-                className="flex flex-col gap-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (code.length === 6) void verify(code);
-                }}
-              >
-                <div className="flex flex-col gap-2">
-                  <Label>{t("auth.codeLabel")}</Label>
-                  <InputOTP maxLength={6} value={code} onChange={setCode} onComplete={(value) => void verify(value)} isInvalid={error !== ""} autoFocus aria-label={t("auth.codeLabel")}>
-                    <InputOTP.Group>
-                      {[0, 1, 2].map((index) => (
-                        <InputOTP.Slot key={index} index={index} />
-                      ))}
-                    </InputOTP.Group>
-                    <InputOTP.Separator />
-                    <InputOTP.Group>
-                      {[3, 4, 5].map((index) => (
-                        <InputOTP.Slot key={index} index={index} />
-                      ))}
-                    </InputOTP.Group>
-                  </InputOTP>
-                  {/* Same type size as the hint it replaces, so the dialog keeps its height when a code is rejected. */}
-                  {error ? <p className="text-xs text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
-                </div>
-                <Button type="submit" variant="primary" isPending={pending} isDisabled={code.length !== 6} className="w-full">
-                  {t("common.signIn")}
-                </Button>
-                {/* No negative margins here: the dialog body is a scroll container, so anything past its edge shows a horizontal scrollbar. */}
-                <div className="flex items-center justify-between gap-2">
-                  <Button size="sm" variant="ghost" onPress={() => { setStep("email"); setError(""); }}>
-                    {t("auth.changeEmail")}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="tabular-nums" isDisabled={wait > 0 || pending} onPress={() => void send()}>
-                    {wait > 0 ? t("auth.resendIn", {seconds: wait}) : t("auth.resend")}
-                  </Button>
-                </div>
-              </Form>
-            )}
-          </Modal.Body>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <section className="flex min-w-0 flex-col gap-4">
+      {locale ? <h1 className="text-2xl font-medium">{heading}</h1> : <h2 className="text-xl font-medium">{heading}</h2>}
+      {mode && <p className="text-sm leading-6 wrap-anywhere text-muted">{description}</p>}
+      {!mode ? (
+        configError
+          ? <div role="alert" className="flex flex-col items-start gap-2">{t("auth.errorNetwork")} <Button size="sm" onPress={() => setAttempt(attempt + 1)}>{t("common.retry")}</Button></div>
+          : <div role="status" aria-label={t("app.opening")}><Spinner /></div>
+      ) : creating && mode === "code" ? link(false) : mode === "password" || step === "email" ? (
+        <Form className="flex flex-col gap-4" onSubmit={(event) => {
+          event.preventDefault();
+          void (mode === "password" ? submitPassword() : send());
+        }}>
+          <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
+            <Label>{t("auth.email")}</Label>
+            <Input autoComplete="email" inputMode="email" />
+          </TextField>
+          {mode === "password" && (
+            <TextField isRequired name="password" type="password" value={password} onChange={edit(setPassword)} minLength={creating ? 8 : undefined} maxLength={128}>
+              <Label>{t("auth.password")}</Label>
+              <Input autoComplete={creating ? "new-password" : "current-password"} />
+              {creating && !error && <Description>{t("auth.passwordHint")}</Description>}
+            </TextField>
+          )}
+          {error && <p className="field-error" data-visible role="alert">{error}</p>}
+          <Button type="submit" variant="primary" isPending={pending} className="w-full">
+            {mode === "code" ? t("auth.getCode") : creating ? t("auth.createAccount") : t("common.signIn")}
+          </Button>
+          {(mode === "password" || locale) && link(!creating)}
+        </Form>
+      ) : (
+        <Form className="flex flex-col gap-4" onSubmit={(event) => {
+          event.preventDefault();
+          if (code.length === 6) void verify(code);
+        }}>
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label>{t("auth.codeLabel")}</Label>
+            <InputOTP maxLength={6} value={code} onChange={setCode} onComplete={(value) => void verify(value)} isInvalid={Boolean(error)} autoFocus aria-label={t("auth.codeLabel")}>
+              <InputOTP.Group>{[0, 1, 2].map((index) => <InputOTP.Slot key={index} index={index} />)}</InputOTP.Group>
+              <InputOTP.Separator />
+              <InputOTP.Group>{[3, 4, 5].map((index) => <InputOTP.Slot key={index} index={index} />)}</InputOTP.Group>
+            </InputOTP>
+            {error ? <p className="text-xs text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
+          </div>
+          <Button type="submit" variant="primary" isPending={pending} isDisabled={code.length !== 6} className="w-full">{t("common.signIn")}</Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button size="sm" variant="ghost" isDisabled={pending} onPress={() => { setStep("email"); setError(""); }}>{t("auth.changeEmail")}</Button>
+            <Button size="sm" variant="ghost" className="tabular-nums" isDisabled={wait > 0 || pending} onPress={() => void send()}>
+              {wait > 0 ? t("auth.resendIn", {seconds: wait}) : t("auth.resend")}
+            </Button>
+          </div>
+        </Form>
+      )}
+    </section>
   );
 }

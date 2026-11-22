@@ -2,7 +2,7 @@
 import * as store from "./db.ts";
 import {parseDocument, serializeDocument} from "./file.ts";
 import {t} from "./i18n.ts";
-import {currentWork, editor, getState, isAvailable, notify, setState, visibleWorks} from "./state.ts";
+import {canOpenWork, currentWork, editor, getState, isAvailable, notify, setState, visibleWorks} from "./state.ts";
 import type {Scene, Session, WorkMeta} from "./types.ts";
 import {emptyScene} from "./types.ts";
 
@@ -68,10 +68,11 @@ export async function createWork(): Promise<string> {
  * Switch to a work that is available on this device. Works not yet downloaded are downloaded by the sync layer first, see openWork in sync.ts.
  */
 export async function openLocalWork(id: string): Promise<boolean> {
-  if (id === getState().currentId) return true;
   const work = getState().works.find((item) => item.id === id);
-  if (!work || !isAvailable(work)) return false;
+  if (!work || !canOpenWork(work) || !isAvailable(work)) return false;
+  if (id === getState().currentId) return true;
   await editor.flush();
+  if (!canOpenWork(work)) return false;
   await setCurrent(id);
   return true;
 }

@@ -33,16 +33,19 @@ export function resetStateForTests() {
   state = {phase: "loading", works: [], currentId: null, loadNonce: 0, session: null, online: true, save: "saved", syncing: false, quota: null};
 }
 
+export function canOpenWork(work: WorkMeta, s: AppState = state): boolean {
+  return work.account === null || work.account === s.session?.user.id;
+}
+
 /** Works visible to the current identity: local works plus the current account's works. Sorted by most recently modified; opening a work doesn't change the order. */
 export function visibleWorks(s: AppState = state): WorkMeta[] {
-  const account = s.session?.user.id ?? null;
   return s.works
-    .filter((work) => work.account === null || work.account === account)
+    .filter((work) => canOpenWork(work, s))
     .sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt);
 }
 
 export function currentWork(s: AppState = state): WorkMeta | null {
-  return s.works.find((work) => work.id === s.currentId) ?? null;
+  return s.works.find((work) => work.id === s.currentId && canOpenWork(work, s)) ?? null;
 }
 
 /** Works that can be opened on this device right now. */

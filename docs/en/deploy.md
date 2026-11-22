@@ -59,7 +59,7 @@ In self-hosted mode:
 - The emailed-code endpoints are turned off.
 - Five wrong passwords for one address lock sign-in for that address for 15 minutes.
 
-In the default mode without `EASEL_SMTP_URL`, the code is printed in the server log. That is meant for development only.
+Production email-code sign-in requires `EASEL_SMTP_URL`. A development server without SMTP prints codes to its log.
 
 Switching an existing deployment from self-hosted to the default mode keeps the accounts. Their addresses stay unverified until the owner signs in with an emailed code, and their passwords are no longer accepted.
 
