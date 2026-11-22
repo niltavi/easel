@@ -60,7 +60,7 @@ function Home({locale}: {locale: Locale}) {
         <p>{copy.description}</p>
         <div className="site-actions">
           <a className={buttonVariants({variant: "primary"})} href={pageHref("app", locale)}>{copy.open}</a>
-          <a className={buttonVariants({variant: "secondary"})} href={repository + "/blob/main/docs/en/for-agents.md"}>{copy.install}</a>
+          <a className={buttonVariants({variant: "secondary"})} href="/llms.txt">{copy.install}</a>
         </div>
       </main>
       <footer className="site-container site-footer">

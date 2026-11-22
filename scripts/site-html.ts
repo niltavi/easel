@@ -38,7 +38,7 @@ function home(locale: Locale) {
     <p>${copy.description}</p>
     <div class="site-actions">
       <a class="button button--primary" href="${pageHref("app", locale)}">${copy.open}</a>
-      <a class="button button--secondary" href="${repository}/blob/main/docs/en/for-agents.md">${copy.install}</a>
+      <a class="button button--secondary" href="/llms.txt">${copy.install}</a>
     </div>
   </main>
   <footer class="site-container site-footer">
