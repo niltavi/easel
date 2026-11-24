@@ -5,6 +5,7 @@ import {bodyLimit} from "hono/body-limit";
 import type {AuthConfig, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../shared/api.ts";
 import {MAX_AI_OBJECTS, MAX_PROMPT_LENGTH, parseDiagram, validateOps} from "../shared/diagram.ts";
 import {AiError, type AiProvider} from "./ai.ts";
+import {discover, generatePkce, generateState, buildAuthUrl, exchangeCode, verifyIdToken, checkSession, type IdentityConfig} from "./identity.ts";
 import type {Mailer} from "./mail.ts";
 import {langOf, message, type MessageKey} from "./messages.ts";
 
@@ -20,6 +21,10 @@ export interface AppOptions {
    * Off by default, where signing in requires a code emailed to the address.
    */
   selfHosted?: boolean;
+  /** Identity OIDC provider. When configured, sign-in goes through Identity. */
+  identity?: IdentityConfig;
+  /** Public origin of this server, for redirect URIs. */
+  origin?: string;
   aiTimeoutMs?: number;
   now?: () => number;
 }
@@ -61,7 +66,7 @@ async function checkPassword(password: string, stored: string | null): Promise<b
 
 type Env = {Variables: {user: User}};
 
-export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTimeoutMs = 60_000, now = Date.now}: AppOptions) {
+export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, identity, origin, aiTimeoutMs = 60_000, now = Date.now}: AppOptions) {
   const app = new Hono<Env>().basePath("/api");
   const fail = (c: Context, status: 400 | 401 | 404 | 409 | 410 | 413 | 429 | 500 | 502 | 503 | 504, error: ErrorCode, key: MessageKey, extra: object = {}, params: Record<string, string | number> = {}) =>
     c.json({error, message: message(langOf(c.req.header("accept-language")), key, params), ...extra}, status);
@@ -87,7 +92,62 @@ export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTim
     return c.json({token, user: {id: user.id, email: user.email}});
   };
 
-  app.get("/auth/config", (c) => c.json({signIn: selfHosted ? "password" : "code"} satisfies AuthConfig));
+  app.get("/auth/config", (c) => {
+    if (identity) return c.json({signIn: "identity", signInUrl: "/api/auth/signin"} satisfies AuthConfig);
+    return c.json({signIn: selfHosted ? "password" : "code"} satisfies AuthConfig);
+  });
+
+  // ---------- Identity OIDC sign-in ----------
+
+  const GRANT_TTL = 5 * 60_000;
+  const PENDING_AUTH_TTL = 10 * 60_000;
+
+  if (identity && origin) {
+    const redirectUri = `${origin}/auth/callback`;
+
+    app.get("/auth/signin", async (c) => {
+      try {
+        const disc = await discover(identity.issuer);
+        const {verifier, challenge} = generatePkce();
+        const state = generateState();
+        db.prepare("INSERT INTO pending_auth (state, code_verifier, redirect_uri, expires_at) VALUES (?, ?, ?, ?)").run(
+          state, verifier, redirectUri, now() + PENDING_AUTH_TTL);
+        db.prepare("DELETE FROM pending_auth WHERE expires_at < ?").run(now());
+        const locale = langOf(c.req.header("accept-language"));
+        const url = buildAuthUrl(disc, identity, redirectUri, state, challenge, locale === "zh-CN" ? "zh-CN" : "en");
+        return c.redirect(url);
+      } catch (error) {
+        console.error("[easel] Identity redirect failed", error);
+        return c.redirect("/?auth_error=identity_unavailable");
+      }
+    });
+  }
+
+  // Exchange a one-time grant code (from the OIDC callback) for a session token.
+  if (identity) {
+    app.post("/auth/grant", async (c) => {
+      const body = await readJson(c);
+      const code = typeof body?.code === "string" ? body.code : "";
+      if (!code) return fail(c, 400, "bad_request", "incompleteRequest");
+      const grant = db.prepare("SELECT user_id, identity_sid, expires_at FROM auth_grants WHERE code = ?").get(code) as
+        | {user_id: string; identity_sid: string | null; expires_at: number}
+        | undefined;
+      if (!grant || grant.expires_at < now()) {
+        if (grant) db.prepare("DELETE FROM auth_grants WHERE code = ?").run(code);
+        return fail(c, 401, "invalid_code", "codeExpired");
+      }
+      db.prepare("DELETE FROM auth_grants WHERE code = ?").run(code);
+      const user = db.prepare("SELECT id, email, name, identity_sub FROM users WHERE id = ?").get(grant.user_id) as
+        | {id: string; email: string; name: string | null; identity_sub: string | null}
+        | undefined;
+      if (!user) return fail(c, 401, "unauthorized", "sessionExpired");
+      const token = randomBytes(32).toString("base64url");
+      db.prepare(
+        "INSERT INTO sessions (token_hash, user_id, expires_at, identity_sub, identity_sid, last_checked) VALUES (?, ?, ?, ?, ?, ?)",
+      ).run(sha256(token), user.id, now() + SESSION_TTL, user.identity_sub, grant.identity_sid, now());
+      return c.json({token, user: {id: user.id, email: user.email, name: user.name ?? undefined}});
+    });
+  }
 
   // ---------- Sign-in on a self-hosted server: email and password, no email is sent ----------
 
@@ -183,16 +243,39 @@ export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTim
 
   // ---------- All endpoints below require sign-in ----------
 
+  const IDENTITY_CHECK_INTERVAL = 60_000;
+  const IDENTITY_MAX_STALE = 5 * 60_000;
+
   app.use("*", async (c, next) => {
     const header = c.req.header("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
     const row = token
       ? (db
-          .prepare("SELECT u.id, u.email, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?")
-          .get(sha256(token)) as {id: string; email: string; expires_at: number} | undefined)
+          .prepare("SELECT u.id, u.email, u.name, s.expires_at, s.identity_sub, s.identity_sid, s.last_checked FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?")
+          .get(sha256(token)) as {id: string; email: string; name: string | null; expires_at: number; identity_sub: string | null; identity_sid: string | null; last_checked: number | null} | undefined)
       : undefined;
     if (!row || row.expires_at < now()) return fail(c, 401, "unauthorized", "sessionExpired");
-    c.set("user", {id: row.id, email: row.email});
+    // Identity sessions must be validated periodically.
+    if (identity && row.identity_sub && row.identity_sid) {
+      const lastChecked = row.last_checked ?? 0;
+      const stale = now() - lastChecked;
+      if (stale >= IDENTITY_CHECK_INTERVAL) {
+        try {
+          const result = await checkSession(identity, row.identity_sub, row.identity_sid);
+          if (!result.active) {
+            db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha256(token));
+            return fail(c, 401, "unauthorized", "sessionExpired");
+          }
+          db.prepare("UPDATE sessions SET last_checked = ? WHERE token_hash = ?").run(now(), sha256(token));
+        } catch {
+          if (stale >= IDENTITY_MAX_STALE) {
+            db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha256(token));
+            return fail(c, 401, "unauthorized", "sessionExpired");
+          }
+        }
+      }
+    }
+    c.set("user", {id: row.id, email: row.email, name: row.name ?? undefined});
     await next();
   });
 
@@ -352,4 +435,115 @@ export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTim
 
   app.all("*", (c) => fail(c, 404, "not_found", "endpointNotFound"));
   return app;
+}
+
+/** OIDC callback, sign-out landing and back-channel notification routes. Mounted at the app root, not under /api. */
+export function createIdentityRoutes({db, identity, origin, now = Date.now}: Pick<AppOptions, "db" | "identity" | "origin" | "now">) {
+  if (!identity || !origin) return null;
+  const routes = new Hono();
+  const redirectUri = `${origin}/auth/callback`;
+
+  const GRANT_TTL = 5 * 60_000;
+
+  function findOrCreateUser(sub: string, email: string, emailVerified: boolean, name: string | null): {id: string; email: string; name: string | null; migrated: boolean} {
+    // Already linked to this Identity sub?
+    const existing = db.prepare("SELECT id, email, name FROM users WHERE identity_sub = ? AND identity_issuer = ?").get(sub, identity!.issuer) as
+      | {id: string; email: string; name: string | null}
+      | undefined;
+    if (existing) {
+      if (name && name !== existing.name) db.prepare("UPDATE users SET name = ? WHERE id = ?").run(name, existing.id);
+      return {...existing, name: name ?? existing.name, migrated: false};
+    }
+
+    // Migration: match by verified email.
+    if (emailVerified) {
+      const byEmail = db.prepare("SELECT id, email, name, email_verified, identity_sub FROM users WHERE email = ?").get(email.toLowerCase()) as
+        | {id: string; email: string; name: string | null; email_verified: number; identity_sub: string | null}
+        | undefined;
+      if (byEmail && byEmail.email_verified === 1 && !byEmail.identity_sub) {
+        db.prepare("UPDATE users SET identity_sub = ?, identity_issuer = ?, email_verified = 1, name = COALESCE(?, name) WHERE id = ?").run(
+          sub, identity!.issuer, name, byEmail.id);
+        return {id: byEmail.id, email: byEmail.email, name: name ?? byEmail.name, migrated: true};
+      }
+    }
+
+    // New user.
+    const id = randomUUID();
+    db.prepare(
+      "INSERT INTO users (id, email, created_at, email_verified, identity_sub, identity_issuer, name) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).run(id, email.toLowerCase(), now!(), emailVerified ? 1 : 0, sub, identity!.issuer, name);
+    return {id, email: email.toLowerCase(), name, migrated: false};
+  }
+
+  routes.get("/auth/callback", async (c) => {
+    const url = new URL(c.req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const error = url.searchParams.get("error");
+
+    if (error) {
+      console.error("[easel] Identity auth error:", error, url.searchParams.get("error_description"));
+      return c.redirect("/?auth_error=identity_denied");
+    }
+    if (!code || !state) return c.redirect("/?auth_error=identity_invalid");
+
+    const pending = db.prepare("SELECT code_verifier, redirect_uri, expires_at FROM pending_auth WHERE state = ?").get(state) as
+      | {code_verifier: string; redirect_uri: string; expires_at: number}
+      | undefined;
+    if (!pending || pending.expires_at < now!()) {
+      if (pending) db.prepare("DELETE FROM pending_auth WHERE state = ?").run(state);
+      return c.redirect("/?auth_error=identity_expired");
+    }
+    db.prepare("DELETE FROM pending_auth WHERE state = ?").run(state);
+
+    try {
+      const disc = await discover(identity!.issuer);
+      const tokens = await exchangeCode(disc, identity!, code, pending.redirect_uri, pending.code_verifier);
+      const claims = await verifyIdToken(tokens.id_token, identity!, disc.jwks_uri);
+      if (!claims.email) return c.redirect("/?auth_error=identity_no_email");
+
+      const user = findOrCreateUser(claims.sub, claims.email, claims.email_verified ?? false, claims.name ?? null);
+      // Store the Identity session ID on the user for session validation.
+      if (claims.sid) {
+        db.prepare("UPDATE users SET identity_sid = ? WHERE id = ?").run(claims.sid, user.id);
+      }
+
+      // Create a one-time grant code that the SPA can exchange for a session token.
+      const grantCode = randomBytes(32).toString("base64url");
+      db.prepare("INSERT INTO auth_grants (code, user_id, identity_sid, expires_at) VALUES (?, ?, ?, ?)").run(
+        grantCode, user.id, claims.sid ?? null, now!() + GRANT_TTL);
+      // Clean up expired grants.
+      db.prepare("DELETE FROM auth_grants WHERE expires_at < ?").run(now!());
+
+      return c.redirect(`/?auth_grant=${encodeURIComponent(grantCode)}`);
+    } catch (err) {
+      console.error("[easel] Identity callback failed", err);
+      return c.redirect("/?auth_error=identity_failed");
+    }
+  });
+
+  routes.get("/auth/signed-out", (c) => c.redirect("/"));
+
+  // Back-channel logout notification from Identity.
+  routes.post("/auth/notifications", async (c) => {
+    try {
+      const form = await c.req.formData().catch(() => null);
+      const logoutToken = form?.get("logout_token");
+      if (typeof logoutToken !== "string") return c.json({error: "missing_token"}, 400);
+      const disc = await discover(identity!.issuer);
+      const claims = await verifyIdToken(logoutToken, identity!, disc.jwks_uri);
+      // Invalidate all sessions for this sub (or just the specific sid).
+      if (claims.sid) {
+        db.prepare("DELETE FROM sessions WHERE identity_sub = ? AND identity_sid = ?").run(claims.sub, claims.sid);
+      } else {
+        db.prepare("DELETE FROM sessions WHERE identity_sub = ?").run(claims.sub);
+      }
+      return c.body(null, 200);
+    } catch (err) {
+      console.error("[easel] back-channel logout failed", err);
+      return c.json({error: "invalid_token"}, 400);
+    }
+  });
+
+  return routes;
 }

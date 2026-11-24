@@ -15,6 +15,7 @@ const messages = {
   codeExpired: ["That code is no longer valid. Request a new one", "验证码已失效，请重新获取"],
   passwordRule: ["Use a password of 8 to 128 characters", "密码长度需为 8 到 128 个字符"],
   emailTaken: ["An account with this email already exists. Sign in instead", "这个邮箱已注册，请直接登录"],
+  identityUnavailable: ["The sign-in service is temporarily unavailable", "登录服务暂时不可用"],
   invalidCredentials: ["Email or password is incorrect", "邮箱或密码不正确"],
   tooManyAttempts: ["Too many attempts. Try again in a few minutes", "尝试次数过多，请过几分钟再试"],
   sessionExpired: ["Your sign-in has expired", "登录已过期"],
@@ -36,6 +37,10 @@ const messages = {
   aiUnrecognized: ["The AI response could not be understood", "AI 返回的内容无法识别"],
   aiRefused: ["AI could not handle this request", "AI 无法处理这条指令"],
   aiTooBig: ["This change is too large. Try describing it in smaller steps", "这次改动太大，试着分几步描述"],
+  identityNoEmail: ["The Identity account has no email address", "Identity 账号没有邮箱地址"],
+  identityDenied: ["Sign-in was cancelled", "登录已取消"],
+  identityExpired: ["The sign-in link has expired. Try again", "登录链接已过期，请重试"],
+  identityFailed: ["Sign-in failed. Try again", "登录失败，请重试"],
   mailSubject: ["{code} is your Easel sign-in code", "{code} 是你的 Easel 登录验证码"],
   mailBody: [
     "Your Easel sign-in code is {code}. It is valid for 10 minutes.\n\nIf you did not request it, you can ignore this email.",

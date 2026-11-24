@@ -4,11 +4,14 @@ import type {Diagram, DiagramOp} from "./diagram.ts";
 export interface User {
   id: string;
   email: string;
+  name?: string;
 }
 
-/** How this server signs people in: an emailed code (the default), or email and password on a self-hosted server. */
+/** How this server signs people in. */
 export interface AuthConfig {
-  signIn: "code" | "password";
+  signIn: "code" | "password" | "identity";
+  /** When signIn is "identity", the URL to navigate to for sign-in. */
+  signInUrl?: string;
 }
 
 export interface RemoteWorkInfo {

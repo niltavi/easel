@@ -32,11 +32,51 @@ function activeSession(): Session | null {
 export const requestCode = (email: string) => api.requestCode(email);
 
 /** How the server signs people in. An unreachable server is treated as the default, an emailed code. */
-export const authMode = () => api.authConfig().then((config) => config.signIn, () => "code" as const);
+let cachedAuthConfig: {signIn: "code" | "password" | "identity"; signInUrl?: string} | null = null;
+export async function authConfig() {
+  if (cachedAuthConfig) return cachedAuthConfig;
+  try {
+    cachedAuthConfig = await api.authConfig();
+  } catch {
+    cachedAuthConfig = {signIn: "code"};
+  }
+  return cachedAuthConfig;
+}
+export const authMode = () => authConfig().then((c) => c.signIn);
 
 export const verifyCode = async (email: string, code: string) => adopt(await api.verifyCode(email, code));
 export const register = async (email: string, password: string) => adopt(await api.register(email, password));
 export const signInWithPassword = async (email: string, password: string) => adopt(await api.login(email, password));
+
+/** Handle an Identity OIDC callback: exchange the grant code in the URL for a session token. */
+export async function handleAuthCallback(): Promise<boolean> {
+  const params = new URLSearchParams(window.location.search);
+  const grantCode = params.get("auth_grant");
+  const authError = params.get("auth_error");
+
+  // Clean up the URL regardless of outcome.
+  if (grantCode || authError) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("auth_grant");
+    url.searchParams.delete("auth_error");
+    window.history.replaceState(null, "", url.pathname + (url.search || "") + url.hash);
+  }
+
+  if (authError) {
+    notify({kind: "warning", title: t("auth.identityError"), sticky: true});
+    return false;
+  }
+  if (!grantCode) return false;
+
+  try {
+    const result = await api.exchangeGrant(grantCode);
+    await adopt(result);
+    return true;
+  } catch {
+    notify({kind: "warning", title: t("auth.identityError"), sticky: true});
+    return false;
+  }
+}
 
 async function adopt({token, user}: {token: string; user: Session["user"]}) {
   const previous = getState().session;

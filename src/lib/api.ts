@@ -56,6 +56,7 @@ export const api = {
   login: (email: string, password: string) => request<{token: string; user: User}>("POST", "/auth/login", {body: {email, password}}),
   requestCode: (email: string) => request<{ok: true}>("POST", "/auth/request", {body: {email}}),
   verifyCode: (email: string, code: string) => request<{token: string; user: User}>("POST", "/auth/verify", {body: {email, code}}),
+  exchangeGrant: (code: string) => request<{token: string; user: User}>("POST", "/auth/grant", {body: {code}}),
   signOut: (token: string) => request<{ok: true}>("POST", "/auth/signout", {token}),
   listWorks: (token: string) => request<{works: RemoteWorkInfo[]}>("GET", "/works", {token}),
   getWork: (token: string, id: string) => request<RemoteWork>("GET", `/works/${id}`, {token}),
