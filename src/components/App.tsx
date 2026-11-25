@@ -11,7 +11,7 @@ import {EASEL_EXTENSION, EaselFileError} from "../lib/file.ts";
 import {useAppState, useIsMobile, useTheme} from "../lib/hooks.ts";
 import {localeName, otherLocale, setLocale, t} from "../lib/i18n.ts";
 import {currentWork, getState, notify, onNotice, setState, ui as uiBridge, visibleWorks} from "../lib/state.ts";
-import {activeSession, disableSync, enableSync, expireSession, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
+import {activeSession, authConfig, disableSync, enableSync, expireSession, handleAuthCallback, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
 import {workStatus, type WorkMeta} from "../lib/types.ts";
 import {createWork, duplicateWork, exportDocument, importDocument, loadWorkspace, removeWork, renameWork} from "../lib/works.ts";
 import {AiPanel} from "./AiPanel.tsx";
@@ -27,10 +27,12 @@ let started = false;
 function start() {
   if (started) return;
   started = true;
-  void loadWorkspace().then(() => {
-    void syncNow();
-    void refreshQuota();
-  });
+  void handleAuthCallback().then(() =>
+    loadWorkspace().then(() => {
+      void syncNow();
+      void refreshQuota();
+    }),
+  );
   window.addEventListener("online", () => {
     setState({online: true});
     void syncNow();
@@ -64,6 +66,15 @@ export function App() {
   const works = visibleWorks(state);
   const getEditor = useCallback(() => editorRef.current, []);
 
+  const signIn = useCallback(async () => {
+    const config = await authConfig();
+    if (config.signIn === "identity") {
+      window.location.href = config.signInUrl ?? "/api/auth/signin";
+    } else {
+      setAuth({open: true});
+    }
+  }, []);
+
   useEffect(start, []);
 
   useEffect(
@@ -89,11 +100,11 @@ export function App() {
   );
 
   useEffect(() => {
-    uiBridge.openAuth = () => setAuth({open: true});
+    uiBridge.openAuth = () => void signIn();
     return () => {
       uiBridge.openAuth = () => {};
     };
-  }, []);
+  }, [signIn]);
 
   useEffect(() => {
     document.title = work ? `${work.name} · Easel` : "Easel";
@@ -141,7 +152,7 @@ export function App() {
   const turnOnSync = (target: WorkMeta) => {
     const run = () => void enableSync(target.id);
     if (activeSession()) run();
-    else setAuth({open: true, reason: t("auth.syncReason"), then: run});
+    else void signIn();
   };
 
   const onAction = (action: WorkAction, target: WorkMeta) => {
@@ -159,7 +170,7 @@ export function App() {
       setAi({open: true, pending: false, error: "", count: countObjects(editorRef.current?.diagram().diagram ?? {nodes: [], edges: []})});
     };
     if (activeSession()) openPanel();
-    else setAuth({open: true, reason: t("auth.aiReason"), then: openPanel});
+    else void signIn();
   };
 
   const closeAi = () => {
@@ -225,7 +236,7 @@ export function App() {
       onAction={onAction}
       onNew={() => void createWork().then(() => setDrawer(false))}
       onImport={() => void importFile()}
-      onSignIn={() => setAuth({open: true})}
+      onSignIn={() => void signIn()}
       onSignOut={() => void signOut()}
     />
   );

@@ -22,7 +22,7 @@ function describe(error: unknown): string {
 
 export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onSignedIn}: Props) {
   // "code" is the default flow; a self-hosted server reports "password" and the dialog switches to it.
-  const [mode, setMode] = useState<"code" | "password">("code");
+  const [mode, setMode] = useState<"code" | "password" | "identity">("code");
   const [creating, setCreating] = useState(false);
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
@@ -41,7 +41,14 @@ export function AuthDialog({isOpen, onOpenChange, reason, defaultEmail = "", onS
     setPassword("");
     setCreating(false);
     let current = true;
-    void authMode().then((value) => current && setMode(value));
+    void authMode().then((value) => {
+      if (!current) return;
+      if (value === "identity") {
+        onOpenChange(false);
+        return;
+      }
+      setMode(value);
+    });
     return () => {
       current = false;
     };

@@ -115,6 +115,8 @@ export const en = {
   "auth.errorGeneric": "Something went wrong. Try again",
   "auth.syncReason": "Once you sign in, this drawing syncs to your account so you can keep editing on other devices.",
   "auth.aiReason": "Sign in to draw and edit with AI. Using AI doesn't require cloud sync for the drawing.",
+  "auth.identityError": "Sign-in didn't complete. Try again.",
+  "auth.identityButton": "Sign in with Niltavi",
 
   "tool.select": "Select",
   "tool.pen": "Pen",
@@ -315,6 +317,8 @@ export const zhCN: Record<MessageKey, string> = {
   "auth.errorGeneric": "出了点问题，请再试一次",
   "auth.syncReason": "登录后，这件作品会同步到你的账号，可以在其他设备上继续编辑。",
   "auth.aiReason": "登录后可以使用 AI 画图和改图。使用 AI 不需要为作品开启云同步。",
+  "auth.identityError": "登录没有完成，请再试一次。",
+  "auth.identityButton": "使用 Niltavi 账号登录",
 
   "tool.select": "选择",
   "tool.pen": "笔",

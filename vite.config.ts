@@ -44,7 +44,7 @@ export default defineConfig({
       },
     }),
   ],
-  server: {proxy: {"/api": apiTarget}},
-  preview: {proxy: {"/api": apiTarget}},
+  server: {proxy: {"/api": apiTarget, "/auth": apiTarget}},
+  preview: {proxy: {"/api": apiTarget, "/auth": apiTarget}},
   test: {environment: "node", include: ["tests/**/*.test.ts"]},
 });
