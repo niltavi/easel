@@ -17,7 +17,6 @@ Run it with a volume for the database:
 ```sh
 docker run -d --name easel -p 8787:8787 \
   -v easel-data:/app/data \
-  -e EASEL_SELF_HOSTED=1 \
   niltavi-easel:local
 ```
 
@@ -37,31 +36,22 @@ pnpm server
 
 `pnpm server` reads settings from `.env` in the repository root. Copy `.env.example` to start.
 
-## Sign-in modes
+## Accounts and sign-in
 
 Drawing, managing drawings, and importing or exporting files work without an account. An account is needed for cloud sync and AI.
 
-| | Default | Self-hosted |
-| --- | --- | --- |
-| Setting | `EASEL_SELF_HOSTED` unset | `EASEL_SELF_HOSTED=1` |
-| Sign in with | A 6-digit code emailed to the address | Email and password |
-| Creating an account | Verifying the first code | The **Create an account** form in the sign-in dialog |
-| Needs a mail service | Yes, `EASEL_SMTP_URL` | No. No email is sent |
-| Email address | Verified | Recorded as unverified |
+The first account created on a server becomes its administrator. Create it right after the first start, at `/register` or with `POST /api/auth/register`. The administrator manages the instance at `/admin`:
 
-Choose self-hosted mode for a local or private deployment that has no mail service. Keep the default for a public service.
+- **Sign-in** turns email and password sign-in on or off and connects Niltavi Identity. Email and password sign-in stays on until another method works.
+- **Accounts** lists accounts and grants or removes the administrator role. A server always keeps at least one administrator.
+- **General** sets the public address and the daily AI preview limit.
 
-In self-hosted mode:
+With email and password sign-in:
 
 - A password has 8 to 128 characters. It is stored as a salted scrypt hash.
 - Anyone who can reach the server can create an account. Put it behind your own network or access control if that is not what you want.
-- There is no password reset, because the server sends no email. To reset one, delete the user's row from the `users` table and let them register again; their synced drawings are tied to the old account.
-- The emailed-code endpoints are turned off.
+- There is no password reset page yet. Keep the administrator password in a password manager.
 - Five wrong passwords for one address lock sign-in for that address for 15 minutes.
-
-Production email-code sign-in requires `EASEL_SMTP_URL`. A development server without SMTP prints codes to its log.
-
-Switching an existing deployment from self-hosted to the default mode keeps the accounts. Their addresses stay unverified until the owner signs in with an emailed code, and their passwords are no longer accepted.
 
 ## Settings
 
@@ -69,10 +59,9 @@ Switching an existing deployment from self-hosted to the default mode keeps the 
 | --- | --- | --- |
 | `PORT` | `8787` | Port to listen on |
 | `EASEL_DB` | `data/easel.db` (`/app/data/easel.db` in the image) | SQLite database file |
-| `EASEL_SELF_HOSTED` | unset | `1` turns on email and password sign-in without email |
-| `EASEL_SMTP_URL` | unset | SMTP server for sign-in codes in the default mode, for example `smtps://user:pass@smtp.example.com:465` |
-| `EASEL_MAIL_FROM` | `Easel <no-reply@localhost>` | Sender of sign-in emails |
+| `EASEL_ORIGIN` | unset | Public address of this server, used for Niltavi Identity redirects. The console can override it |
+| `IDENTITY_ISSUER`, `IDENTITY_APP_ID`, `IDENTITY_APP_SECRET` | unset | Niltavi Identity credentials. The console can override them |
 | `ANTHROPIC_API_KEY` | unset | Enables AI. Without it, AI is unavailable and everything else works |
 | `EASEL_AI_MODEL`, `EASEL_AI_EFFORT` | see `.env.example` | Model and effort for AI edits |
-| `EASEL_AI_DAILY_QUOTA` | `5` | AI previews per account per day |
+| `EASEL_AI_DAILY_QUOTA` | `5` | AI previews per account per day. The console can override it |
 | `EASEL_AI_MOCK` | unset | `1` returns a fixed sample edit without calling a model, for demos |

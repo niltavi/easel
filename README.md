@@ -14,7 +14,7 @@
 
 Easel puts handwriting, text, shapes, and connectors on one infinite canvas. Drag from the edge of a shape to connect it to another. Number keys switch tools.
 
-Drawings are saved on the device, and the app works offline once installed. Sync is off by default. After signing in with an email code, you turn it on for the drawings you want on other devices.
+Drawings are saved on the device, and the app works offline once installed. Sync is off by default. After signing in, you turn it on for the drawings you want on other devices.
 
 AI can draw a flowchart from a description or edit the one on the canvas. It shows the change as a preview, which you apply or discard.
 
