@@ -133,7 +133,8 @@ export function Root() {
 
   return (
     <>
-      <Header url={url} />
+      {/* The drawing page has its own top bar; brand, theme, language and GitHub live in the account menu. */}
+      {page !== "app" && <Header url={url} />}
       {page === "home" ? <Home locale={locale} />
         : page === "app" && App ? <App locale={locale} />
         : page !== "app" && AuthPage ? <AuthPage key={page} creating={page === "register"} locale={locale} onSignedIn={() => { const current = readRoute(new URL(location.href)); if (current.page === page) navigate(pageHref("app", current.locale), true); }} />

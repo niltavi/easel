@@ -90,6 +90,14 @@ export const en = {
   "works.more": "More actions for “{name}”",
   "works.guestHint": "Drawings are saved on this device. Sign in to turn on cloud sync for individual drawings.",
 
+  "account.menu": "Account menu",
+  "account.guest": "Not signed in",
+  "account.about": "About",
+  "account.settings": "Settings",
+  "account.github": "GitHub repository",
+  "account.light": "Light",
+  "account.dark": "Dark",
+
   "session.expired": "Sign-in expired",
   "session.expiredBody": "Changes keep saving on this device and will sync once you sign in again.",
 
@@ -291,6 +299,14 @@ export const zhCN: Record<MessageKey, string> = {
   "works.empty": "没有名称包含“{query}”的作品",
   "works.more": "「{name}」的更多操作",
   "works.guestHint": "作品保存在这台设备上。登录后可以为单件作品开启云同步。",
+
+  "account.menu": "账户菜单",
+  "account.guest": "未登录",
+  "account.about": "关于",
+  "account.settings": "设置",
+  "account.github": "GitHub 仓库",
+  "account.light": "浅色",
+  "account.dark": "深色",
 
   "session.expired": "登录已过期",
   "session.expiredBody": "改动会继续保存在这台设备上，重新登录后再同步。",
