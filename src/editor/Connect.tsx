@@ -8,7 +8,7 @@ const SIDES: Side[] = ["top", "right", "bottom", "left"];
 /** How close the pointer must be to an object for the handles to appear (screen pixels). */
 const HOVER_REACH = 30;
 /** Distance from the handles to the object's edge; when selected, stay clear of the engine's own resize and rotate handles. */
-const GAP = 14;
+const GAP = 20;
 const GAP_SELECTED = 36;
 
 interface Drag {
@@ -36,7 +36,13 @@ function hit(elements: readonly ExcalidrawElement[], x: number, y: number, reach
   for (let index = elements.length - 1; index >= 0; index--) {
     const element = elements[index];
     if (element.id === except || !isConnectable(element)) continue;
-    if (x >= element.x - reach && x <= element.x + element.width + reach && y >= element.y - reach && y <= element.y + element.height + reach) return element;
+    const inReach = x >= element.x - reach && x <= element.x + element.width + reach && y >= element.y - reach && y <= element.y + element.height + reach;
+    if (!inReach) continue;
+    if (element.type === "text") {
+      const onElement = x >= element.x && x <= element.x + element.width && y >= element.y && y <= element.y + element.height;
+      if (onElement) continue;
+    }
+    return element;
   }
   return null;
 }
