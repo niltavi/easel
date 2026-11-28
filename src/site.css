@@ -48,6 +48,29 @@ body {
   text-wrap: pretty;
 }
 
+.easel-site-header .niltavi-product-header__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "brand controls" "nav sign-in";
+  row-gap: var(--spacing);
+  padding-block: var(--spacing);
+}
+
+.easel-site-header .niltavi-project-brand { grid-area: brand; justify-self: start; }
+.easel-site-nav { grid-area: nav; }
+.easel-site-header .niltavi-product-header__actions { display: contents; }
+.easel-site-header .niltavi-product-header__actions > a { grid-area: sign-in; justify-self: end; }
+.easel-site-header .niltavi-product-header__controls { grid-area: controls; }
+
+@media (min-width: 576px) {
+  .easel-site-header .niltavi-product-header__inner {
+    display: flex;
+    padding-block: 0;
+  }
+
+  .easel-site-header .niltavi-product-header__actions { display: flex; }
+}
+
 .site-actions {
   display: flex;
   flex-wrap: wrap;

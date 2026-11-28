@@ -1,5 +1,5 @@
 export type Locale = "en" | "zh-CN";
-export type Page = "home" | "app" | "login" | "register" | "admin";
+export type Page = "home" | "app" | "login" | "register" | "admin" | "self-host";
 
 export const locales = ["en", "zh-CN"] as const;
 export const repository = "https://github.com/niltavi/easel";
@@ -11,7 +11,7 @@ export function route(pathname: string): {page: Page; locale: Locale} | undefine
   const pagePath = chinese ? path.slice(3) : path;
   const locale = chinese ? "zh-CN" : "en";
   if (pagePath === "") return {page: "home", locale};
-  if (pagePath === "/app" || pagePath === "/login" || pagePath === "/register") {
+  if (pagePath === "/app" || pagePath === "/login" || pagePath === "/register" || pagePath === "/self-host") {
     return {page: pagePath.slice(1) as Exclude<Page, "home">, locale};
   }
   if (pagePath === "/admin" || pagePath.startsWith("/admin/")) return {page: "admin", locale};

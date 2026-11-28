@@ -17,7 +17,6 @@ docker build -t niltavi-easel:local .
 ```sh
 docker run -d --name easel -p 8787:8787 \
   -v easel-data:/app/data \
-  -e EASEL_SELF_HOSTED=1 \
   niltavi-easel:local
 ```
 
@@ -37,31 +36,22 @@ pnpm server
 
 `pnpm server` 读取仓库根目录的 `.env`，可以从 `.env.example` 复制一份开始。
 
-## 登录模式
+## 账号和登录
 
 画图、管理画作、导入导出文件都不需要账号。云同步和 AI 需要登录。
 
-| | 默认 | 自托管 |
-| --- | --- | --- |
-| 配置 | 不设置 `EASEL_SELF_HOSTED` | `EASEL_SELF_HOSTED=1` |
-| 登录方式 | 发到邮箱的 6 位验证码 | 邮箱和密码 |
-| 创建账号 | 第一次通过验证码验证 | 登录弹窗里的「创建账号」 |
-| 是否需要邮件服务 | 需要，配置 `EASEL_SMTP_URL` | 无需邮件服务，服务器不发任何邮件 |
-| 邮箱地址 | 已验证 | 记录为未验证 |
+服务器上创建的第一个账号就是管理员。首次启动后马上创建，可以打开 `/register`，也可以调用 `POST /api/auth/register`。管理员在 `/admin` 管理实例：
 
-本地或私有部署、手头没有邮件服务时，用自托管模式。对外公开的服务保持默认模式。
+- **登录方式**：开关邮箱密码登录，接入 Niltavi Identity。在其他方式可用之前，邮箱密码登录会一直保持开启。
+- **账号**：查看账号，授予或取消管理员。服务器至少保留一个管理员。
+- **常规**：设置公开地址和每天的 AI 预览次数。
 
-自托管模式下：
+使用邮箱密码登录时：
 
 - 密码长度为 8 到 128 个字符，以加盐的 scrypt 哈希保存。
 - 能访问到服务器的人都可以创建账号。如果这不符合你的预期，请把它放在自己的网络或访问控制后面。
-- 服务器不发邮件，所以没有找回密码的功能。需要重置时，从 `users` 表里删掉这个用户的记录，让对方重新注册；之前同步的画挂在旧账号下。
-- 邮箱验证码相关的接口处于关闭状态。
+- 目前还没有找回密码的页面，请把管理员密码保存在密码管理器里。
 - 同一个邮箱连续输错 5 次密码后，这个邮箱会被锁定 15 分钟。
-
-生产环境的邮箱验证码登录需要配置 `EASEL_SMTP_URL`。开发环境未配置 SMTP 时，验证码会写入服务日志。
-
-把已有部署从自托管切回默认模式时，账号会保留。这些账号的邮箱仍是未验证状态，直到本人用邮箱验证码登录一次；原来的密码在默认模式下失效。
 
 ## 配置项
 
@@ -69,10 +59,9 @@ pnpm server
 | --- | --- | --- |
 | `PORT` | `8787` | 监听端口 |
 | `EASEL_DB` | `data/easel.db`（镜像内为 `/app/data/easel.db`） | SQLite 数据库文件 |
-| `EASEL_SELF_HOSTED` | 未设置 | 设为 `1` 时启用邮箱加密码登录，全程不发邮件 |
-| `EASEL_SMTP_URL` | 未设置 | 默认模式下发送验证码的 SMTP 服务，例如 `smtps://user:pass@smtp.example.com:465` |
-| `EASEL_MAIL_FROM` | `Easel <no-reply@localhost>` | 登录邮件的发件人 |
+| `EASEL_ORIGIN` | 未设置 | 服务器的公开地址，用于 Niltavi Identity 回调。可在管理台覆盖 |
+| `IDENTITY_ISSUER`、`IDENTITY_APP_ID`、`IDENTITY_APP_SECRET` | 未设置 | Niltavi Identity 凭据。可在管理台覆盖 |
 | `ANTHROPIC_API_KEY` | 未设置 | 启用 AI。不设置时 AI 不可用，其余功能照常 |
 | `EASEL_AI_MODEL`、`EASEL_AI_EFFORT` | 见 `.env.example` | AI 改图使用的模型和强度 |
-| `EASEL_AI_DAILY_QUOTA` | `5` | 每个账号每天的 AI 预览次数 |
+| `EASEL_AI_DAILY_QUOTA` | `5` | 每个账号每天的 AI 预览次数。可在管理台覆盖 |
 | `EASEL_AI_MOCK` | 未设置 | 设为 `1` 时返回固定的示例改动，不调用模型，用于演示 |
