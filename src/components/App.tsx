@@ -14,7 +14,7 @@ import {useTheme} from "../site/theme.ts";
 import type {Locale} from "../site/routes.ts";
 import "../index.css";
 import {currentWork, getState, notify, onNotice, setState, ui as uiBridge, visibleWorks} from "../lib/state.ts";
-import {activeSession, disableSync, enableSync, expireSession, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
+import {activeSession, authConfig, disableSync, enableSync, expireSession, handleAuthCallback, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
 import {workStatus, type WorkMeta} from "../lib/types.ts";
 import {createWork, duplicateWork, exportDocument, importDocument, loadWorkspace, removeWork, renameWork} from "../lib/works.ts";
 import {AiPanel} from "./AiPanel.tsx";
@@ -30,10 +30,12 @@ let started = false;
 function start() {
   if (started) return;
   started = true;
-  void loadWorkspace().then(() => {
-    void syncNow();
-    void refreshQuota();
-  });
+  void handleAuthCallback().then(() =>
+    loadWorkspace().then(() => {
+      void syncNow();
+      void refreshQuota();
+    }),
+  );
   window.addEventListener("online", () => {
     setState({online: true});
     void syncNow();
@@ -69,6 +71,13 @@ export function App({locale}: {locale: Locale}) {
   const works = visibleWorks(state);
   const getEditor = useCallback(() => editorRef.current, []);
 
+  const signIn = useCallback(async () => {
+    const config = await authConfig();
+    // Identity is the only method on offer: go straight to it. Otherwise the dialog lists what is available.
+    if (!config.localLogin && config.signInUrl) window.location.href = config.signInUrl;
+    else setAuth({open: true});
+  }, []);
+
   useEffect(start, []);
 
   useEffect(() => {
@@ -102,11 +111,11 @@ export function App({locale}: {locale: Locale}) {
   );
 
   useEffect(() => {
-    uiBridge.openAuth = () => setAuth({open: true});
+    uiBridge.openAuth = () => void signIn();
     return () => {
       uiBridge.openAuth = () => {};
     };
-  }, []);
+  }, [signIn]);
 
   useEffect(() => {
     document.title = work ? `${work.name} · Easel` : "Easel";
@@ -162,7 +171,7 @@ export function App({locale}: {locale: Locale}) {
   const turnOnSync = (target: WorkMeta) => {
     const run = () => void enableSync(target.id);
     if (activeSession()) run();
-    else setAuth({open: true, reason: t("auth.syncReason"), then: run});
+    else void signIn();
   };
 
   const onAction = (action: WorkAction, target: WorkMeta) => {
@@ -180,7 +189,7 @@ export function App({locale}: {locale: Locale}) {
       setAi({open: true, pending: false, error: "", count: countObjects(editorRef.current?.diagram().diagram ?? {nodes: [], edges: []})});
     };
     if (activeSession()) openPanel();
-    else setAuth({open: true, reason: t("auth.aiReason"), then: openPanel});
+    else void signIn();
   };
 
   const closeAi = () => {
@@ -238,7 +247,7 @@ export function App({locale}: {locale: Locale}) {
       onAction={onAction}
       onNew={() => void createWork().then(() => setDrawer(false))}
       onImport={() => void importFile()}
-      onSignIn={() => setAuth({open: true})}
+      onSignIn={() => void signIn()}
       onSignOut={() => void signOut()}
     />
   );

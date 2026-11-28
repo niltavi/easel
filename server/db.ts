@@ -45,5 +45,49 @@ export function openDatabase(path: string): DatabaseSync {
   const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as {name: string}[]).map((column) => column.name));
   if (!columns.has("password_hash")) db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
   if (!columns.has("email_verified")) db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1");
+  if (!columns.has("identity_sub")) db.exec("ALTER TABLE users ADD COLUMN identity_sub TEXT");
+  if (!columns.has("identity_issuer")) db.exec("ALTER TABLE users ADD COLUMN identity_issuer TEXT");
+  if (!columns.has("identity_sid")) db.exec("ALTER TABLE users ADD COLUMN identity_sid TEXT");
+  if (!columns.has("name")) db.exec("ALTER TABLE users ADD COLUMN name TEXT");
+  if (!columns.has("role")) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+  // The first account on a server is its administrator, so an existing server always has one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    UPDATE users SET role = 'admin'
+      WHERE id = (SELECT id FROM users ORDER BY created_at, id LIMIT 1)
+        AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');
+  `);
+
+  const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {name: string}[]).map((t) => t.name));
+  if (!tables.has("auth_grants")) {
+    db.exec(`
+      CREATE TABLE auth_grants (
+        code TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id),
+        identity_sid TEXT,
+        expires_at INTEGER NOT NULL
+      )
+    `);
+  }
+  if (!tables.has("pending_auth")) {
+    db.exec(`
+      CREATE TABLE pending_auth (
+        state TEXT PRIMARY KEY,
+        code_verifier TEXT NOT NULL,
+        redirect_uri TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      )
+    `);
+  }
+
+  // Session-level Identity tracking: the session needs sub and sid for periodic validation.
+  const sessionColumns = new Set((db.prepare("PRAGMA table_info(sessions)").all() as {name: string}[]).map((c) => c.name));
+  if (!sessionColumns.has("identity_sub")) db.exec("ALTER TABLE sessions ADD COLUMN identity_sub TEXT");
+  if (!sessionColumns.has("identity_sid")) db.exec("ALTER TABLE sessions ADD COLUMN identity_sid TEXT");
+  if (!sessionColumns.has("last_checked")) db.exec("ALTER TABLE sessions ADD COLUMN last_checked INTEGER");
+
   return db;
 }

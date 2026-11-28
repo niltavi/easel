@@ -7,12 +7,11 @@ import {openDatabase} from "../server/db.ts";
 import * as store from "../src/lib/db.ts";
 import {parseDocument, serializeDocument} from "../src/lib/file.ts";
 import {currentWork, getState, onNotice, resetStateForTests, setState, visibleWorks, type Notice} from "../src/lib/state.ts";
-import {disableSync, enableSync, openWork, signOut, syncNow, verifyCode} from "../src/lib/sync.ts";
+import {disableSync, enableSync, openWork, register, signInWithPassword, signOut, syncNow} from "../src/lib/sync.ts";
 import {workStatus, type Scene} from "../src/lib/types.ts";
 import {createWork, loadWorkspace, removeWork, saveScene} from "../src/lib/works.ts";
 
 let app: ReturnType<typeof createApp>;
-let codes: Record<string, string>;
 let clock: number;
 let online: boolean;
 let notices: Notice[];
@@ -20,17 +19,18 @@ let requests: string[];
 
 const sceneWith = (label: string): Scene => ({elements: [{id: label, type: "rectangle"}], files: {}, view: {scrollX: 0, scrollY: 0, zoom: 1}});
 
+const PASSWORD = "correct horse";
+
 async function signIn(email: string) {
-  await app.request("/api/auth/request", {method: "POST", body: JSON.stringify({email}), headers: {"content-type": "application/json"}});
-  await verifyCode(email, codes[email]);
+  // The first sign-in creates the account; later ones sign in to it.
+  await register(email, PASSWORD).catch(() => signInWithPassword(email, PASSWORD));
   await syncNow();
 }
 
 /** Simulates "another device": calls the server API directly. */
 async function otherDevice(email: string) {
   clock += 61_000;
-  await app.request("/api/auth/request", {method: "POST", body: JSON.stringify({email}), headers: {"content-type": "application/json"}});
-  const res = await app.request("/api/auth/verify", {method: "POST", body: JSON.stringify({email, code: codes[email]}), headers: {"content-type": "application/json"}});
+  const res = await app.request("/api/auth/login", {method: "POST", body: JSON.stringify({email, password: PASSWORD}), headers: {"content-type": "application/json"}});
   const {token} = (await res.json()) as {token: string};
   const call = (method: string, path: string, body?: unknown) =>
     app.request(`/api${path}`, {method, body: body ? JSON.stringify(body) : undefined, headers: {authorization: `Bearer ${token}`, "content-type": "application/json"}});
@@ -47,14 +47,12 @@ beforeEach(async () => {
   await store.resetDbForTests();
   globalThis.indexedDB = new IDBFactory();
   resetStateForTests();
-  codes = {};
   clock = 1_800_000_000_000;
   online = true;
   notices = [];
   requests = [];
   app = createApp({
     db: openDatabase(":memory:"),
-    mailer: async (email, code) => void (codes[email] = code),
     ai: null,
     dailyQuota: 5,
     now: () => clock,

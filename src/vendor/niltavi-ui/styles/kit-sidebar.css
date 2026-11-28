@@ -1,0 +1,59 @@
+/* Collapsible sidebar, from Niltavi UI 1d81c2e. Import once after the theme. */
+
+/* From src/templates/scenarios.css#Sidebar */
+/* ---------- Sidebar ---------- */
+.nt-side { display: flex; flex-direction: column; gap: 14px; width: 240px; min-width: 0; height: 100%; padding: 12px 10px; border-right: 1px solid var(--separator); background: var(--surface-secondary); font-size: .8125rem; transition: width var(--motion-slow) var(--motion-ease-fluid); overflow: hidden; }
+.nt-side[data-collapsed] { width: 60px; align-items: center; }
+.nt-side__nav { flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.nt-side[data-collapsed] .nt-side__nav { width: 100%; }
+.nt-side__group ul { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.nt-side__heading { display: block; padding: 0 10px 6px; color: var(--muted); font-size: .6875rem; font-weight: 500; white-space: nowrap; }
+.nt-side[data-collapsed] .nt-side__heading { height: 1px; padding: 0; margin: 0 8px 8px; overflow: hidden; background: var(--separator); color: transparent; }
+.nt-side__item { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: var(--radius-lg); background: none; color: var(--muted); font: inherit; text-align: left; white-space: nowrap; cursor: var(--cursor-interactive); }
+.nt-side__item:hover { background: var(--default); color: var(--foreground); }
+.nt-side__item[aria-current] { background: var(--accent-soft); color: var(--accent-soft-foreground); font-weight: 500; }
+.nt-side__item[data-within] { color: var(--foreground); }
+.nt-side__item:focus-visible, .nt-side__subitem:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.nt-side__item > svg:first-child { flex-shrink: 0; }
+.nt-side__label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.nt-side__badge { min-width: 18px; padding: 0 6px; border-radius: 99px; background: var(--default); color: var(--muted); font-size: .6875rem; line-height: 18px; text-align: center; }
+.nt-side__chevron { flex-shrink: 0; transition: transform var(--motion-base) var(--motion-ease); }
+.nt-side__item[aria-expanded="true"] .nt-side__chevron { transform: rotate(180deg); }
+.nt-side[data-collapsed] .nt-side__item { justify-content: center; padding: 9px; }
+.nt-side[data-collapsed] :is(.nt-side__label, .nt-side__badge, .nt-side__chevron) { display: none; }
+.nt-side__sub { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--motion-base) var(--motion-ease); }
+.nt-side__sub[data-open] { grid-template-rows: 1fr; }
+.nt-side__sub > ul { overflow: hidden; margin-left: 18px !important; padding-left: 10px !important; border-left: 1px solid var(--separator); }
+.nt-side__sub[data-open] > ul { padding-block: 2px !important; }
+.nt-side__subitem { width: 100%; padding: 6px 10px; border: 0; border-radius: var(--radius-lg); background: none; color: var(--muted); font: inherit; text-align: left; cursor: var(--cursor-interactive); }
+.nt-side__subitem:hover { background: var(--default); color: var(--foreground); }
+.nt-side__subitem[aria-current] { color: var(--accent-soft-foreground); font-weight: 500; }
+/* The divider runs edge to edge, meeting the sidebar border. */
+.nt-side__footer { display: flex; align-items: center; align-self: stretch; gap: 4px; margin-inline: -10px; padding: 10px 10px 0; border-top: 1px solid var(--separator); }
+.nt-side[data-collapsed] .nt-side__footer { flex-direction: column; }
+.nt-side__footer > .nt-user { flex: 1; min-width: 0; }
+.nt-side__collapse { flex-shrink: 0; color: var(--muted); }
+.nt-side__header { min-width: 0; }
+/* Collapsed: workspace and account buttons become square and centred on the rail. */
+.nt-side[data-collapsed] :is(.nt-ws, .nt-user) { flex: none; justify-content: center; width: 40px; min-width: 0; height: 40px; min-height: 0; padding: 0; }
+.nt-side__brand { display: flex; align-items: center; gap: 10px; min-height: 40px; padding-inline: 6px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }
+.nt-side[data-collapsed] .nt-side__brand { justify-content: center; padding: 0; }
+.nt-side[data-collapsed] .nt-side__brand > span:last-child { display: none; }
+.nt-side:not([data-collapsed]) .nt-side__header > .nt-ws { width: 100%; }
+
+.nt-ws, .nt-user { justify-content: flex-start; gap: 10px; height: auto; min-height: 40px; padding: 6px; text-align: left; }
+.nt-ws__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.nt-ws__text strong { overflow: hidden; font-size: .8125rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.nt-ws__text span { overflow: hidden; color: var(--muted); font-size: .6875rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.nt-ws__chevron { margin-left: auto; color: var(--muted); }
+.nt-ws__mini { width: 20px; height: 20px; font-size: .625rem; }
+.nt-user__card { display: flex; align-items: center; gap: 10px; padding: 10px 12px 8px; }
+.nt-user__card > div { display: flex; flex-direction: column; min-width: 0; font-size: .8125rem; }
+.nt-user__card span { color: var(--muted); font-size: .75rem; }
+
+/* From src/templates/kits/kits.css#Sidebar */
+/* ---------- Sidebar ---------- */
+.kit-sidebar { display: grid; grid-template-columns: auto minmax(0, 1fr); height: 100%; font-size: .875rem; }
+.kit-sidebar__main { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 28px 32px; }
+.kit-sidebar__main h4 { font-size: 1.125rem; font-weight: 600; letter-spacing: -.01em; }
+.kit-sidebar__main p { max-width: 52ch; color: var(--muted); text-wrap: pretty; }

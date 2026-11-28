@@ -23,18 +23,15 @@ beforeEach(async () => {
     seen.push(diagram);
     return goodOps;
   };
-  let code = "";
   app = createApp({
     db: openDatabase(":memory:"),
-    mailer: async (_email, value) => void (code = value),
     ai: (prompt, diagram, signal) => provider(prompt, diagram, signal),
     dailyQuota: 2,
     aiTimeoutMs: 50,
     now: () => clock,
   });
   const json = {"content-type": "application/json"};
-  await app.request("/api/auth/request", {method: "POST", body: JSON.stringify({email: "a@example.com"}), headers: json});
-  const res = await app.request("/api/auth/verify", {method: "POST", body: JSON.stringify({email: "a@example.com", code}), headers: json});
+  const res = await app.request("/api/auth/register", {method: "POST", body: JSON.stringify({email: "a@example.com", password: "correct horse"}), headers: json});
   token = ((await res.json()) as {token: string}).token;
 });
 

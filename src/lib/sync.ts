@@ -1,6 +1,6 @@
 // Sign-in session and cloud sync.
 // The cloud stores a versioned full snapshot per work; the local copy is always the usable one, and a sync failure doesn't affect editing.
-import type {PushConflict, RemoteWorkInfo} from "../../shared/api.ts";
+import type {AuthConfig, PushConflict, RemoteWorkInfo} from "../../shared/api.ts";
 import {api, ApiError} from "./api.ts";
 import * as store from "./db.ts";
 import {EaselFileError, parseDocument, serializeDocument} from "./file.ts";
@@ -29,11 +29,48 @@ function activeSession(): Session | null {
 
 // ---------- Sign-in ----------
 
-export const requestCode = (email: string) => api.requestCode(email);
+/** Sign-in methods the server offers now. Read on each sign-in so a change by the admin shows up without a reload. */
+export async function authConfig(): Promise<AuthConfig> {
+  try {
+    return await api.authConfig();
+  } catch {
+    // Unreachable server: offer the local method, which is the server's default.
+    return {localLogin: true, identityLogin: false};
+  }
+}
 
-export const verifyCode = async (email: string, code: string) => adopt(await api.verifyCode(email, code));
 export const register = async (email: string, password: string) => adopt(await api.register(email, password));
 export const signInWithPassword = async (email: string, password: string) => adopt(await api.login(email, password));
+
+/** Handle an Identity OIDC callback: exchange the grant code in the URL for a session token. */
+export async function handleAuthCallback(): Promise<boolean> {
+  const params = new URLSearchParams(window.location.search);
+  const grantCode = params.get("auth_grant");
+  const authError = params.get("auth_error");
+
+  // Clean up the URL regardless of outcome.
+  if (grantCode || authError) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("auth_grant");
+    url.searchParams.delete("auth_error");
+    window.history.replaceState(null, "", url.pathname + (url.search || "") + url.hash);
+  }
+
+  if (authError) {
+    notify({kind: "warning", title: t("auth.identityError"), sticky: true});
+    return false;
+  }
+  if (!grantCode) return false;
+
+  try {
+    const result = await api.exchangeGrant(grantCode);
+    await adopt(result);
+    return true;
+  } catch {
+    notify({kind: "warning", title: t("auth.identityError"), sticky: true});
+    return false;
+  }
+}
 
 async function adopt({token, user}: {token: string; user: Session["user"]}) {
   const previous = getState().session;

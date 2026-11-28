@@ -1,5 +1,7 @@
 @import "./theme/index.css";
 @import "./theme/motion.css";
+@import "./vendor/niltavi-ui/styles/saas.css";
+@import "./vendor/niltavi-ui/styles/kit-sidebar.css";
 
 html, body, #root {
   min-height: 100%;

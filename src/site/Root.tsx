@@ -11,6 +11,7 @@ import {toggleTheme, useTheme} from "./theme.ts";
 
 const loadApp = () => import("../components/App.tsx");
 const loadAuth = () => import("../components/AuthDialog.tsx");
+const loadAdmin = () => import("../admin/AdminPage.tsx");
 const readRoute = (url: URL) => route(url.pathname) ?? {page: "home" as const, locale: "en" as const};
 
 function Header({url}: {url: URL}) {
@@ -20,7 +21,7 @@ function Header({url}: {url: URL}) {
   const brand = page === "app" ? "app" : "home";
   return (
     <ProductHeader
-      variant={page === "app" ? "app" : "site"}
+      variant={page === "app" || page === "admin" ? "app" : "site"}
       brand={{name: "Easel", href: pageHref(brand, locale), symbol: <img src="/favicon.svg" width={40} height={40} alt="" />}}
       theme={theme}
       onToggleTheme={toggleTheme}
@@ -65,6 +66,7 @@ export function Root() {
   const [url, setUrl] = useState(() => new URL(location.href));
   const [App, setApp] = useState<typeof import("../components/App.tsx").App>();
   const [AuthPage, setAuthPage] = useState<typeof import("../components/AuthDialog.tsx").AuthPage>();
+  const [AdminPage, setAdminPage] = useState<typeof import("../admin/AdminPage.tsx").AdminPage>();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const lastNavigation = useRef(0);
@@ -88,12 +90,14 @@ export function Root() {
       try {
         const app = view.page === "app" ? await loadApp() : undefined;
         const auth = view.page === "login" || view.page === "register" ? await loadAuth() : undefined;
+        const admin = view.page === "admin" ? await loadAdmin() : undefined;
         if (index !== lastNavigation.current) return;
         if (activePage.current === "app" && view.page !== "app") await editor.flush();
         if (index !== lastNavigation.current) return;
         activePage.current = view.page;
         if (app) setApp(() => app.App);
         if (auth) setAuthPage(() => auth.AuthPage);
+        if (admin) setAdminPage(() => admin.AdminPage);
         selectLocale(view.locale);
         setUrl(next);
       } catch {
@@ -128,6 +132,7 @@ export function Root() {
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (description) description.content = siteCopy[locale].description;
     if (page === "home") document.title = siteCopy[locale].title;
+    else if (page === "admin") document.title = t("admin.title") + " · Easel";
     else if (page !== "app") document.title = (page === "login" ? t("auth.title") : t("auth.registerTitle")) + " · Easel";
   }, [page, locale]);
 
@@ -136,7 +141,8 @@ export function Root() {
       <Header url={url} />
       {page === "home" ? <Home locale={locale} />
         : page === "app" && App ? <App locale={locale} />
-        : page !== "app" && AuthPage ? <AuthPage key={page} creating={page === "register"} locale={locale} onSignedIn={() => { const current = readRoute(new URL(location.href)); if (current.page === page) navigate(pageHref("app", current.locale), true); }} />
+        : page === "admin" && AdminPage ? <AdminPage locale={locale} path={url.pathname} />
+        : page !== "app" && page !== "admin" && AuthPage ? <AuthPage key={page} creating={page === "register"} locale={locale} onSignedIn={() => { const current = readRoute(new URL(location.href)); if (current.page === page) navigate(pageHref("app", current.locale), true); }} />
         : <main className="site-pending" role="status" aria-label={t("app.opening")}>{!failed && <Spinner />}</main>}
       {pending && <span role="status" className="sr-only">{t("app.opening")}</span>}
       {failed && <div role="alert" className="niltavi-container py-4">{t("api.unavailable")} <Button size="sm" onPress={() => location.reload()}>{t("common.retry")}</Button></div>}

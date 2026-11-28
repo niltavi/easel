@@ -1,8 +1,9 @@
-import {Button, Description, Form, Input, InputOTP, Label, Modal, Spinner, TextField} from "@heroui/react";
+import {Button, Description, Form, Input, Label, Modal, Spinner, TextField} from "@heroui/react";
 import {useEffect, useState} from "react";
+import type {AuthConfig} from "../../shared/api.ts";
 import {api, ApiError} from "../lib/api.ts";
 import {t} from "../lib/i18n.ts";
-import {register, requestCode, signInWithPassword, verifyCode} from "../lib/sync.ts";
+import {register, signInWithPassword} from "../lib/sync.ts";
 import {pageHref, type Locale} from "../site/routes.ts";
 import {EmailPasswordForm} from "../vendor/niltavi-ui/EmailPasswordForm.tsx";
 
@@ -19,8 +20,6 @@ interface DialogProps extends Pick<AuthFormProps, "reason" | "defaultEmail" | "o
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const RESEND_SECONDS = 60;
 
 function describe(error: unknown): string {
   if (error instanceof ApiError) return error.code === "network" ? t("auth.errorNetwork") : error.message;
@@ -53,59 +52,31 @@ export function AuthPage(props: AuthFormProps) {
 }
 
 function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSignedIn}: AuthFormProps) {
-  const [mode, setMode] = useState<"code" | "password">();
+  const [config, setConfig] = useState<AuthConfig>();
   const [configError, setConfigError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [password, setPassword] = useState("");
-  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState(defaultEmail);
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [wait, setWait] = useState(0);
 
   useEffect(() => {
     let current = true;
     setConfigError(false);
-    void api.authConfig().then(({signIn}) => {
-      if (current) setMode(signIn);
+    void api.authConfig().then((value) => {
+      if (current) setConfig(value);
     }, () => {
       if (current) setConfigError(true);
     });
     return () => { current = false; };
   }, [attempt]);
 
-  useEffect(() => {
-    if (wait <= 0) return;
-    const timer = setTimeout(() => setWait((seconds) => seconds - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [wait]);
-
-  const send = async () => {
-    if (pending) return;
-    setPending(true);
-    setError("");
-    try {
-      await requestCode(email.trim());
-      setStep("code");
-      setCode("");
-      setWait(RESEND_SECONDS);
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.code === "rate_limited") {
-        setStep("code");
-        setWait(RESEND_SECONDS);
-      } else setError(describe(cause));
-    } finally {
-      setPending(false);
-    }
-  };
-
   const edit = (set: (value: string) => void) => (value: string) => {
     set(value);
     setError("");
   };
 
-  const submitPassword = async () => {
+  const submit = async () => {
     if (pending) return;
     setPending(true);
     setError("");
@@ -119,38 +90,17 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
     }
   };
 
-  const verify = async (value: string) => {
-    if (pending) return;
-    setPending(true);
-    setError("");
-    try {
-      await verifyCode(email.trim(), value);
-      onSignedIn();
-    } catch (cause) {
-      setError(describe(cause));
-      setCode("");
-    } finally {
-      setPending(false);
-    }
-  };
+  const identityButton = config?.identityLogin && config.signInUrl ? (
+    <Button variant="secondary" className="w-full" onPress={() => { window.location.href = config.signInUrl!; }}>
+      {t("auth.identityButton")}
+    </Button>
+  ) : null;
 
-  const link = (toRegister: boolean) => {
-    const label = toRegister ? t("auth.toRegister") : t("auth.toSignIn");
-    if (locale) return <a className="self-start text-sm underline underline-offset-4" href={pageHref(toRegister ? "register" : "login", locale)}>{label}</a>;
-    if (onSwitch) return <Button size="sm" variant="ghost" className="self-start" isDisabled={pending} onPress={() => {
-      setPassword("");
-      setError("");
-      onSwitch();
-    }}>{label}</Button>;
-  };
+  const heading = creating ? t("auth.registerTitle") : t("auth.title");
+  const description = reason ?? (config?.localLogin ? (creating ? t("auth.introRegister") : t("auth.introPassword")) : t("auth.identityIntro"));
 
-  const heading = creating ? t("auth.registerTitle") : step === "code" ? t("auth.codeTitle") : t("auth.title");
-  const description = creating
-    ? mode === "code" ? t("auth.hostedRegistration") : t("auth.introRegister")
-    : step === "code" ? t("auth.codeSent", {email: email.trim()})
-      : reason ?? (mode === "password" ? t("auth.introPassword") : t("auth.intro"));
-
-  if (mode === "password" && locale) {
+  // Local form for the public login and register pages, styled by the shared Niltavi form.
+  if (config?.localLogin && locale) {
     return (
       <>
         <h1 className="sr-only">{heading}</h1>
@@ -173,6 +123,7 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
           }}
         >
           <p className="text-sm leading-6 text-muted">{description}</p>
+          {identityButton && <><p className="text-center text-sm text-muted">{t("auth.or")}</p>{identityButton}</>}
         </EmailPasswordForm>
       </>
     );
@@ -181,55 +132,43 @@ function AuthForm({reason, defaultEmail = "", creating, locale, onSwitch, onSign
   return (
     <section className="flex min-w-0 flex-col gap-4">
       {locale ? <h1 className="text-2xl font-medium">{heading}</h1> : <h2 className="text-xl font-medium">{heading}</h2>}
-      {mode && <p className="text-sm leading-6 wrap-anywhere text-muted">{description}</p>}
-      {!mode ? (
+      <p className="text-sm leading-6 wrap-anywhere text-muted">{description}</p>
+      {!config ? (
         configError
           ? <div role="alert" className="flex flex-col items-start gap-2">{t("auth.errorNetwork")} <Button size="sm" onPress={() => setAttempt(attempt + 1)}>{t("common.retry")}</Button></div>
           : <div role="status" aria-label={t("app.opening")}><Spinner /></div>
-      ) : creating && mode === "code" ? link(false) : mode === "password" || step === "email" ? (
-        <Form method="post" className="flex flex-col gap-4" onSubmit={(event) => {
-          event.preventDefault();
-          void (mode === "password" ? submitPassword() : send());
-        }}>
-          <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
-            <Label>{t("auth.email")}</Label>
-            <Input autoComplete="email" inputMode="email" />
-          </TextField>
-          {mode === "password" && (
-            <TextField isRequired name="password" type="password" value={password} onChange={edit(setPassword)} minLength={creating ? 8 : undefined} maxLength={128}>
-              <Label>{t("auth.password")}</Label>
-              <Input autoComplete={creating ? "new-password" : "current-password"} />
-              {creating && !error && <Description>{t("auth.passwordHint")}</Description>}
-            </TextField>
-          )}
-          {error && <p className="field-error" data-visible role="alert">{error}</p>}
-          <Button type="submit" variant="primary" isPending={pending} className="w-full">
-            {mode === "code" ? t("auth.getCode") : creating ? t("auth.createAccount") : t("common.signIn")}
-          </Button>
-          {(mode === "password" || locale) && link(!creating)}
-        </Form>
       ) : (
-        <Form method="post" className="flex flex-col gap-4" onSubmit={(event) => {
-          event.preventDefault();
-          if (code.length === 6) void verify(code);
-        }}>
-          <div className="flex min-w-0 flex-col gap-2">
-            <Label>{t("auth.codeLabel")}</Label>
-            <InputOTP maxLength={6} value={code} onChange={setCode} onComplete={(value) => void verify(value)} isInvalid={Boolean(error)} autoFocus aria-label={t("auth.codeLabel")}>
-              <InputOTP.Group>{[0, 1, 2].map((index) => <InputOTP.Slot key={index} index={index} />)}</InputOTP.Group>
-              <InputOTP.Separator />
-              <InputOTP.Group>{[3, 4, 5].map((index) => <InputOTP.Slot key={index} index={index} />)}</InputOTP.Group>
-            </InputOTP>
-            {error ? <p className="text-xs text-danger" role="alert">{error}</p> : <Description>{t("auth.noCode")}</Description>}
-          </div>
-          <Button type="submit" variant="primary" isPending={pending} isDisabled={code.length !== 6} className="w-full">{t("common.signIn")}</Button>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button size="sm" variant="ghost" isDisabled={pending} onPress={() => { setStep("email"); setError(""); }}>{t("auth.changeEmail")}</Button>
-            <Button size="sm" variant="ghost" className="tabular-nums" isDisabled={wait > 0 || pending} onPress={() => void send()}>
-              {wait > 0 ? t("auth.resendIn", {seconds: wait}) : t("auth.resend")}
-            </Button>
-          </div>
-        </Form>
+        <>
+          {config.localLogin && (
+            <Form method="post" className="flex flex-col gap-4" onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}>
+              <TextField isRequired name="email" type="email" value={email} onChange={edit(setEmail)} autoFocus>
+                <Label>{t("auth.email")}</Label>
+                <Input autoComplete="email" inputMode="email" />
+              </TextField>
+              <TextField isRequired name="password" type="password" value={password} onChange={edit(setPassword)} minLength={creating ? 8 : undefined} maxLength={128}>
+                <Label>{t("auth.password")}</Label>
+                <Input autoComplete={creating ? "new-password" : "current-password"} />
+                {creating && !error && <Description>{t("auth.passwordHint")}</Description>}
+              </TextField>
+              {error && <p className="field-error" data-visible role="alert">{error}</p>}
+              <Button type="submit" variant="primary" isPending={pending} className="w-full">
+                {creating ? t("auth.createAccount") : t("common.signIn")}
+              </Button>
+              {onSwitch && (
+                <Button size="sm" variant="ghost" className="self-start" isDisabled={pending} onPress={() => {
+                  setPassword("");
+                  setError("");
+                  onSwitch();
+                }}>{creating ? t("auth.toSignIn") : t("auth.toRegister")}</Button>
+              )}
+            </Form>
+          )}
+          {config.localLogin && identityButton && <p className="text-center text-sm text-muted">{t("auth.or")}</p>}
+          {identityButton}
+        </>
       )}
     </section>
   );
