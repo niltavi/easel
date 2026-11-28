@@ -14,7 +14,7 @@ import {useTheme} from "../site/theme.ts";
 import type {Locale} from "../site/routes.ts";
 import "../index.css";
 import {currentWork, getState, notify, onNotice, setState, ui as uiBridge, visibleWorks} from "../lib/state.ts";
-import {activeSession, disableSync, enableSync, expireSession, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
+import {activeSession, authConfig, disableSync, enableSync, expireSession, handleAuthCallback, openWork, refreshQuota, signOut, syncNow} from "../lib/sync.ts";
 import {workStatus, type WorkMeta} from "../lib/types.ts";
 import {createWork, duplicateWork, exportDocument, importDocument, loadWorkspace, removeWork, renameWork} from "../lib/works.ts";
 import {AiPanel} from "./AiPanel.tsx";
@@ -30,10 +30,12 @@ let started = false;
 function start() {
   if (started) return;
   started = true;
-  void loadWorkspace().then(() => {
-    void syncNow();
-    void refreshQuota();
-  });
+  void handleAuthCallback().then(() =>
+    loadWorkspace().then(() => {
+      void syncNow();
+      void refreshQuota();
+    }),
+  );
   window.addEventListener("online", () => {
     setState({online: true});
     void syncNow();
@@ -69,6 +71,13 @@ export function App({locale}: {locale: Locale}) {
   const works = visibleWorks(state);
   const getEditor = useCallback(() => editorRef.current, []);
 
+  const signIn = useCallback(async () => {
+    const config = await authConfig();
+    // Identity is the only method on offer: go straight to it. Otherwise the dialog lists what is available.
+    if (!config.localLogin && config.signInUrl) window.location.href = config.signInUrl;
+    else setAuth({open: true});
+  }, []);
+
   useEffect(start, []);
 
   useEffect(() => {
@@ -102,11 +111,11 @@ export function App({locale}: {locale: Locale}) {
   );
 
   useEffect(() => {
-    uiBridge.openAuth = () => setAuth({open: true});
+    uiBridge.openAuth = () => void signIn();
     return () => {
       uiBridge.openAuth = () => {};
     };
-  }, []);
+  }, [signIn]);
 
   useEffect(() => {
     document.title = work ? `${work.name} · Easel` : "Easel";
@@ -148,6 +157,7 @@ export function App({locale}: {locale: Locale}) {
     if (!file) return;
     try {
       await importDocument(await file.text(), sanitizeScene);
+      void syncNow();
       setDrawer(false);
       notify({kind: "success", title: t("import.done")});
     } catch (error) {
@@ -162,12 +172,15 @@ export function App({locale}: {locale: Locale}) {
   const turnOnSync = (target: WorkMeta) => {
     const run = () => void enableSync(target.id);
     if (activeSession()) run();
-    else setAuth({open: true, reason: t("auth.syncReason"), then: run});
+    else void signIn();
   };
 
   const onAction = (action: WorkAction, target: WorkMeta) => {
     if (action === "rename") setRenaming(target);
-    else if (action === "duplicate") void duplicateWork(target.id).then(() => setDrawer(false));
+    else if (action === "duplicate") void duplicateWork(target.id).then(() => {
+        void syncNow();
+        setDrawer(false);
+      });
     else if (action === "export") void exportFile(target);
     else if (action === "sync-on") turnOnSync(target);
     else setConfirm({kind: action, work: target});
@@ -180,7 +193,7 @@ export function App({locale}: {locale: Locale}) {
       setAi({open: true, pending: false, error: "", count: countObjects(editorRef.current?.diagram().diagram ?? {nodes: [], edges: []})});
     };
     if (activeSession()) openPanel();
-    else setAuth({open: true, reason: t("auth.aiReason"), then: openPanel});
+    else void signIn();
   };
 
   const closeAi = () => {
@@ -238,7 +251,7 @@ export function App({locale}: {locale: Locale}) {
       onAction={onAction}
       onNew={() => void createWork().then(() => setDrawer(false))}
       onImport={() => void importFile()}
-      onSignIn={() => setAuth({open: true})}
+      onSignIn={() => void signIn()}
       onSignOut={() => void signOut()}
     />
   );
@@ -433,36 +446,44 @@ function ConfirmDialog({confirm, onClose}: {confirm: Confirm; onClose: () => voi
     setPending(true);
     try {
       if (kind === "delete") await removeWork(work.id);
-      else await disableSync(work.id);
+      else if (await disableSync(work.id)) {
+        notify({kind: "success", title: t("sync.movedLocalTitle", {name: work.name}), description: t("sync.movedLocalBody")});
+      }
     } finally {
       setPending(false);
       onClose();
     }
   };
   const body =
-    kind === "sync-off"
-      ? t("confirm.syncOffBody")
-      : status === "local"
-        ? t("confirm.deleteLocal")
-        : status === "remote"
-          ? t("confirm.deleteRemote")
-          : t("confirm.deleteBoth");
+    kind === "sync-off" ? (
+      <ul className="list-disc space-y-1.5 ps-5">
+        <li>{t("confirm.syncOffBody")}</li>
+        <li className="text-danger">{t("confirm.syncOffRisk")}</li>
+        <li>{t("confirm.syncOffUndo")}</li>
+      </ul>
+    ) : (
+      <p>
+        {status === "local"
+          ? t("confirm.deleteLocal")
+          : status === "remote"
+            ? t("confirm.deleteRemote")
+            : t("confirm.deleteBoth")}
+      </p>
+    );
   return (
     <AlertDialog.Backdrop isOpen={confirm !== null} onOpenChange={(isOpen) => !isOpen && !pending && onClose()}>
       <AlertDialog.Container>
         <AlertDialog.Dialog className="sm:max-w-[400px]">
           <AlertDialog.Header>
-            <AlertDialog.Icon status={kind === "delete" ? "danger" : "warning"} />
+            <AlertDialog.Icon status="danger" />
             <AlertDialog.Heading>{kind === "delete" ? t("confirm.deleteTitle", {name: work.name}) : t("confirm.syncOffTitle", {name: work.name})}</AlertDialog.Heading>
           </AlertDialog.Header>
-          <AlertDialog.Body>
-            <p>{body}</p>
-          </AlertDialog.Body>
+          <AlertDialog.Body>{body}</AlertDialog.Body>
           <AlertDialog.Footer>
             <Button variant="tertiary" isDisabled={pending} onPress={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button variant={kind === "delete" ? "danger" : "primary"} isPending={pending} onPress={() => void run()}>
+            <Button variant="danger" isPending={pending} onPress={() => void run()}>
               {kind === "delete" ? t("common.delete") : t("confirm.syncOff")}
             </Button>
           </AlertDialog.Footer>

@@ -2,11 +2,13 @@ import type {Locale} from "./routes.ts";
 
 export const siteCopy = {
   en: {
-    title: "Easel — A personal whiteboard",
+    title: "Easel",
     heading: "A personal whiteboard",
     description: "Sketch by hand, arrange shapes, and connect ideas on an infinite canvas that works offline.",
     open: "Open whiteboard",
-    install: "Installation guide for agents",
+    "self-host": "Self-host",
+    home: "Home",
+    navigation: "Website navigation",
     signIn: "Sign in",
     language: "Language",
     dark: "Switch to dark theme",
@@ -14,11 +16,13 @@ export const siteCopy = {
     github: "GitHub repository",
   },
   "zh-CN": {
-    title: "Easel — 个人画板",
+    title: "Easel · 个人画板",
     heading: "个人画板",
     description: "在无限画布上手写、摆放形状、连接想法。断网也可以继续画。",
     open: "打开画板",
-    install: "给 Agent 的安装指南",
+    "self-host": "本地部署",
+    home: "首页",
+    navigation: "官网导航",
     signIn: "登录",
     language: "语言",
     dark: "切换深色主题",

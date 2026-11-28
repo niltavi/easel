@@ -173,12 +173,12 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
         <Separator orientation="vertical" />
         <ButtonGroup size="sm" variant="tertiary">
           <Tip label={t("common.undo")}>
-            <Button isIconOnly variant="tertiary" aria-label={t("common.undo")} onPress={() => editor()?.undo()}>
+            <Button isIconOnly size="sm" variant="tertiary" aria-label={t("common.undo")} onPress={() => editor()?.undo()}>
               <ArrowUturnCcwLeft aria-hidden />
             </Button>
           </Tip>
           <Tip label={t("common.redo")}>
-            <Button isIconOnly variant="tertiary" aria-label={t("common.redo")} onPress={() => editor()?.redo()}>
+            <Button isIconOnly size="sm" variant="tertiary" aria-label={t("common.redo")} onPress={() => editor()?.redo()}>
               <ButtonGroup.Separator />
               <ArrowUturnCwRight aria-hidden />
             </Button>

@@ -1,9 +1,10 @@
 # Easel
 
-Easel is an offline-first personal whiteboard. Its browser app is available at /app.
+Easel is an offline-first personal whiteboard. Its browser app is available at /app and the administrator console at /admin.
 
-To install a new instance, confirm the host and access scope with the operator, then follow the Docker deployment guide. Keep SQLite on a named Docker volume. Open the instance, choose Open whiteboard, draw a shape, reload, and confirm it persists.
+To install a new instance for a user, follow the agent installation guide. It covers deploying with Docker, creating the administrator account (the first account on a server), opening /admin and /app for the user, and verifying the instance.
 
+- Agent installation guide: https://github.com/niltavi/easel/blob/main/docs/en/for-agents.md
+- Copy of the guide on this site: /for-agents.md
 - Source: https://github.com/niltavi/easel
-- Docker deployment: https://github.com/niltavi/easel/blob/main/docs/en/deploy.md
-- Agent installation and verification: https://github.com/niltavi/easel/blob/main/docs/en/for-agents.md
+- Deployment reference: https://github.com/niltavi/easel/blob/main/docs/en/deploy.md

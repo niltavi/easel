@@ -4,11 +4,65 @@ import type {Diagram, DiagramOp} from "./diagram.ts";
 export interface User {
   id: string;
   email: string;
+  name?: string;
 }
 
-/** How this server signs people in: an emailed code (the default), or email and password on a self-hosted server. */
+/** The sign-in methods this server offers right now. */
 export interface AuthConfig {
-  signIn: "code" | "password";
+  /** Email and password, handled by this server. */
+  localLogin: boolean;
+  /** Niltavi Identity, a third-party sign-in method. */
+  identityLogin: boolean;
+  /** Where to send people for Identity sign-in. Present when identityLogin is true. */
+  signInUrl?: string;
+}
+
+/** Counts and the state of each sign-in method, for the console's overview. */
+export interface AdminOverview {
+  counts: {accounts: number; admins: number; identityAccounts: number; works: number};
+  localLogin: boolean;
+  identityLogin: boolean;
+  identityReady: boolean;
+  publicOrigin: string | null;
+  aiConfigured: boolean;
+}
+
+/** Sign-in settings. The client secret is never sent back; only whether one is saved. */
+export interface AdminSignIn {
+  localLogin: boolean;
+  identityLogin: boolean;
+  identity: {
+    issuer: string;
+    appId: string;
+    appSecretSaved: boolean;
+    /** Whether all Identity settings are present and Identity can be turned on. */
+    ready: boolean;
+    /** The address Identity must redirect to, derived from the public address. */
+    callbackUrl: string | null;
+  };
+}
+
+export interface AdminSignInInput {
+  localLogin: boolean;
+  identityLogin: boolean;
+  /** Omit to leave the saved Identity settings alone. An empty appSecret keeps the saved one. */
+  identity?: {issuer: string; appId: string; appSecret?: string};
+}
+
+export interface AdminAccount {
+  id: string;
+  email: string;
+  name: string | null;
+  role: "admin" | "user";
+  createdAt: number;
+  works: number;
+  identity: boolean;
+}
+
+export interface AdminGeneral {
+  publicOrigin: string;
+  aiDailyQuota: number;
+  aiConfigured: boolean;
 }
 
 export interface RemoteWorkInfo {
@@ -59,6 +113,8 @@ export type ErrorCode =
   | "rate_limited"
   | "invalid_code"
   | "invalid_credentials"
+  | "login_disabled"
+  | "forbidden"
   | "email_taken"
   | "not_found"
   | "conflict"

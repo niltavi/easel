@@ -299,7 +299,7 @@
     max-width: 100%;
     padding: var(--spacing);
     overflow-x: auto;
-    border-radius: var(--radius-2xl);
+    border-radius: calc(var(--radius) * 2.5);
     background: var(--overlay);
     box-shadow: var(--overlay-shadow);
     scrollbar-width: none;
@@ -346,10 +346,10 @@
     animation: nt-fade-up var(--motion-fast) var(--motion-ease) both;
   }
 
+  /* Dividers are short and centred, as in the niltavi floating bar, rather than running the full height of the bar. */
   .easel-bar > .separator {
-    align-self: stretch;
-    height: auto;
-    margin-block: var(--spacing);
+    align-self: center;
+    height: calc(var(--spacing) * 4);
   }
 
   .easel-inks {
