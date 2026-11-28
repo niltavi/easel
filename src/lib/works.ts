@@ -29,9 +29,20 @@ function uniqueName(base: string): string {
   }
 }
 
-function blankMeta(name: string, account: string | null = null): WorkMeta {
+function blankMeta(name: string): WorkMeta {
   const now = Date.now();
-  return {id: newId(), name, account, createdAt: now, updatedAt: now, openedAt: now, cloud: null};
+  return {id: newId(), name, account: null, createdAt: now, updatedAt: now, openedAt: now, cloud: null};
+}
+
+/**
+ * A new work. While signed in it belongs to the account and syncs by default; it stays on this device only after the user moves it back.
+ * A blank work has nothing to upload until its first change, so untouched canvases don't pile up in the cloud.
+ */
+function newMeta(name: string, hasContent: boolean): WorkMeta {
+  const meta = blankMeta(name);
+  const session = getState().session;
+  if (!session) return meta;
+  return {...meta, account: session.user.id, cloud: {baseVersion: 0, dirty: hasContent, downloaded: true, rev: hasContent ? 1 : 0}};
 }
 
 /** Startup: restore the last opened work if available; otherwise fall back to the most recent available one, and failing that provide a blank canvas. */
@@ -58,7 +69,7 @@ async function setCurrent(id: string) {
 
 export async function createWork(): Promise<string> {
   await editor.flush();
-  const meta = blankMeta(uniqueName(t("name.untitled")));
+  const meta = newMeta(uniqueName(t("name.untitled")), false);
   await store.putWork(meta, emptyScene());
   await setCurrent(meta.id);
   return meta.id;
@@ -85,7 +96,7 @@ export async function ensureCurrent() {
   const next = visible.find(isAvailable);
   if (next) await setCurrent(next.id);
   else {
-    const meta = blankMeta(uniqueName(t("name.untitled")));
+    const meta = newMeta(uniqueName(t("name.untitled")), false);
     await store.putWork(meta, emptyScene());
     await setCurrent(meta.id);
   }
@@ -156,7 +167,7 @@ export async function duplicateWork(id: string): Promise<string | null> {
   const source = await store.getWork(id);
   const scene = await store.getScene(id);
   if (!source || !scene) return null;
-  const meta = {...blankMeta(uniqueName(t("name.copy", {name: source.name})), source.account)};
+  const meta = newMeta(uniqueName(t("name.copy", {name: source.name})), true);
   await store.putWork(meta, scene);
   await setCurrent(meta.id);
   return meta.id;
@@ -184,7 +195,7 @@ export async function importDocument(text: string, sanitize: (scene: Scene) => S
   const parsed = parseDocument(text);
   const scene = sanitize(parsed.scene);
   await editor.flush();
-  const meta = blankMeta(uniqueName(parsed.name));
+  const meta = newMeta(uniqueName(parsed.name), true);
   await store.putWork(meta, scene);
   await setCurrent(meta.id);
   return meta.id;

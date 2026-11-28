@@ -157,6 +157,7 @@ export function App({locale}: {locale: Locale}) {
     if (!file) return;
     try {
       await importDocument(await file.text(), sanitizeScene);
+      void syncNow();
       setDrawer(false);
       notify({kind: "success", title: t("import.done")});
     } catch (error) {
@@ -176,7 +177,10 @@ export function App({locale}: {locale: Locale}) {
 
   const onAction = (action: WorkAction, target: WorkMeta) => {
     if (action === "rename") setRenaming(target);
-    else if (action === "duplicate") void duplicateWork(target.id).then(() => setDrawer(false));
+    else if (action === "duplicate") void duplicateWork(target.id).then(() => {
+        void syncNow();
+        setDrawer(false);
+      });
     else if (action === "export") void exportFile(target);
     else if (action === "sync-on") turnOnSync(target);
     else setConfirm({kind: action, work: target});
@@ -442,36 +446,44 @@ function ConfirmDialog({confirm, onClose}: {confirm: Confirm; onClose: () => voi
     setPending(true);
     try {
       if (kind === "delete") await removeWork(work.id);
-      else await disableSync(work.id);
+      else if (await disableSync(work.id)) {
+        notify({kind: "success", title: t("sync.movedLocalTitle", {name: work.name}), description: t("sync.movedLocalBody")});
+      }
     } finally {
       setPending(false);
       onClose();
     }
   };
   const body =
-    kind === "sync-off"
-      ? t("confirm.syncOffBody")
-      : status === "local"
-        ? t("confirm.deleteLocal")
-        : status === "remote"
-          ? t("confirm.deleteRemote")
-          : t("confirm.deleteBoth");
+    kind === "sync-off" ? (
+      <ul className="list-disc space-y-1.5 ps-5">
+        <li>{t("confirm.syncOffBody")}</li>
+        <li className="text-danger">{t("confirm.syncOffRisk")}</li>
+        <li>{t("confirm.syncOffUndo")}</li>
+      </ul>
+    ) : (
+      <p>
+        {status === "local"
+          ? t("confirm.deleteLocal")
+          : status === "remote"
+            ? t("confirm.deleteRemote")
+            : t("confirm.deleteBoth")}
+      </p>
+    );
   return (
     <AlertDialog.Backdrop isOpen={confirm !== null} onOpenChange={(isOpen) => !isOpen && !pending && onClose()}>
       <AlertDialog.Container>
         <AlertDialog.Dialog className="sm:max-w-[400px]">
           <AlertDialog.Header>
-            <AlertDialog.Icon status={kind === "delete" ? "danger" : "warning"} />
+            <AlertDialog.Icon status="danger" />
             <AlertDialog.Heading>{kind === "delete" ? t("confirm.deleteTitle", {name: work.name}) : t("confirm.syncOffTitle", {name: work.name})}</AlertDialog.Heading>
           </AlertDialog.Header>
-          <AlertDialog.Body>
-            <p>{body}</p>
-          </AlertDialog.Body>
+          <AlertDialog.Body>{body}</AlertDialog.Body>
           <AlertDialog.Footer>
             <Button variant="tertiary" isDisabled={pending} onPress={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button variant={kind === "delete" ? "danger" : "primary"} isPending={pending} onPress={() => void run()}>
+            <Button variant="danger" isPending={pending} onPress={() => void run()}>
               {kind === "delete" ? t("common.delete") : t("confirm.syncOff")}
             </Button>
           </AlertDialog.Footer>
