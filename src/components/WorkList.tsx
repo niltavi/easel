@@ -1,8 +1,8 @@
 import {BarsDescendingAlignLeft, ArrowRightFromSquare, Cloud, CloudArrowUpIn, CloudCheck, Display, Ellipsis, FileArrowUp, Person, Plus} from "@gravity-ui/icons";
 import {Button, Dropdown, Label, SearchField, Separator} from "@heroui/react";
 import {useMemo, useState, type ReactNode} from "react";
-import {locale, t} from "../lib/i18n.ts";
-import {STATUS_LABEL, workStatus, type Session, type WorkMeta, type WorkStatus} from "../lib/types.ts";
+import {locale, t, type MessageKey} from "../lib/i18n.ts";
+import {workStatus, type Session, type WorkMeta, type WorkStatus} from "../lib/types.ts";
 
 export type WorkAction = "rename" | "duplicate" | "sync-on" | "sync-off" | "export" | "delete";
 
@@ -16,9 +16,10 @@ const STATUS_ICON: Record<WorkStatus, ReactNode> = {
 /** Where a work is stored and its sync status. In compact mode only the icon stays; the text moves into the tooltip and the screen-reader name. */
 export function StatusLine({work, compact = false}: {work: WorkMeta; compact?: boolean}) {
   const status = workStatus(work);
+  const label = t(`status.${status}`);
   if (compact) {
     return (
-      <span className="easel-status easel-status--icon" data-status={status} role="img" aria-label={STATUS_LABEL[status]} title={STATUS_LABEL[status]}>
+      <span className="easel-status easel-status--icon" data-status={status} role="img" aria-label={label} title={label}>
         {STATUS_ICON[status]}
       </span>
     );
@@ -26,18 +27,18 @@ export function StatusLine({work, compact = false}: {work: WorkMeta; compact?: b
   return (
     <span className="easel-status" data-status={status}>
       {STATUS_ICON[status]}
-      {STATUS_LABEL[status]}
+      {label}
     </span>
   );
 }
 
 type SortKey = "updated" | "opened" | "name" | "created";
 
-const SORTS: {key: SortKey; label: string}[] = [
-  {key: "updated", label: t("sort.updated")},
-  {key: "opened", label: t("sort.opened")},
-  {key: "name", label: t("sort.name")},
-  {key: "created", label: t("sort.created")},
+const SORTS: {key: SortKey; label: MessageKey}[] = [
+  {key: "updated", label: "sort.updated"},
+  {key: "opened", label: "sort.opened"},
+  {key: "name", label: "sort.name"},
+  {key: "created", label: "sort.created"},
 ];
 
 const SORT_STORAGE = "easel.sort";
@@ -52,13 +53,16 @@ function readSort(): SortKey {
   return "updated";
 }
 
-const collator = new Intl.Collator(locale, {numeric: true, sensitivity: "base"});
+const collators = {
+  en: new Intl.Collator("en", {numeric: true, sensitivity: "base"}),
+  "zh-CN": new Intl.Collator("zh-CN", {numeric: true, sensitivity: "base"}),
+};
 
-function sortWorks(works: WorkMeta[], key: SortKey): WorkMeta[] {
+function sortWorks(works: WorkMeta[], key: SortKey, language: typeof locale): WorkMeta[] {
   // The incoming list is already sorted by most recently modified.
   if (key === "updated") return works;
   const sorted = [...works];
-  if (key === "name") sorted.sort((a, b) => collator.compare(a.name, b.name));
+  if (key === "name") sorted.sort((a, b) => collators[language].compare(a.name, b.name));
   else if (key === "created") sorted.sort((a, b) => b.createdAt - a.createdAt);
   else sorted.sort((a, b) => b.openedAt - a.openedAt);
   return sorted;
@@ -117,8 +121,8 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
   const [sort, setSort] = useState<SortKey>(readSort);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return sortWorks(needle ? works.filter((work) => work.name.toLowerCase().includes(needle)) : works, sort);
-  }, [works, query, sort]);
+    return sortWorks(needle ? works.filter((work) => work.name.toLowerCase().includes(needle)) : works, sort, locale);
+  }, [works, query, sort, locale]);
   const chooseSort = (key: SortKey) => {
     setSort(key);
     try {
@@ -133,7 +137,7 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
       <div className="easel-works__head">
         <h2 className="easel-works__title">{t("works.workspace")}</h2>
         <Dropdown>
-          <Button isIconOnly size="sm" variant="ghost" aria-label={t("sort.current", {label: SORTS.find((item) => item.key === sort)?.label ?? ""})}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label={t("sort.current", {label: t(SORTS.find((item) => item.key === sort)?.label ?? "sort.updated")})}>
             <BarsDescendingAlignLeft aria-hidden />
           </Button>
           <Dropdown.Popover placement="bottom end">
@@ -148,9 +152,9 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
               }}
             >
               {SORTS.map((item) => (
-                <Dropdown.Item key={item.key} id={item.key} textValue={item.label}>
+                <Dropdown.Item key={item.key} id={item.key} textValue={t(item.label)}>
                   <Dropdown.ItemIndicator />
-                  <Label>{item.label}</Label>
+                  <Label>{t(item.label)}</Label>
                 </Dropdown.Item>
               ))}
             </Dropdown.Menu>

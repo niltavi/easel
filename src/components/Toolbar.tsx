@@ -4,7 +4,7 @@ import {useEffect, useRef, useState, type ReactNode} from "react";
 import type {OpsSummary} from "../../shared/diagram.ts";
 import type {EditorHandle, EditorUi} from "../editor/Editor.tsx";
 import {t} from "../lib/i18n.ts";
-import {CONNECTOR_TOOLS, INKS, SHAPE_TOOLS, TOOL_KEYS, TOOL_LABEL, WIDTHS, type ConnectorTool, type ShapeTool, type Tool} from "../editor/tools.ts";
+import {CONNECTOR_TOOLS, INKS, SHAPE_TOOLS, TOOL_KEYS, WIDTHS, type ConnectorTool, type ShapeTool, type Tool} from "../editor/tools.ts";
 import {CursorIcon, DiamondIcon, EllipseIcon, LineIcon} from "./icons.tsx";
 
 const isShape = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool);
@@ -48,11 +48,11 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
     editor()?.setTool(tool);
   };
   const entries: {id: string; tool: Tool; label: string}[] = [
-    {id: "select", tool: "select", label: TOOL_LABEL.select},
-    {id: "pen", tool: "pen", label: TOOL_LABEL.pen},
-    {id: "eraser", tool: "eraser", label: TOOL_LABEL.eraser},
+    {id: "select", tool: "select", label: t("tool.select")},
+    {id: "pen", tool: "pen", label: t("tool.pen")},
+    {id: "eraser", tool: "eraser", label: t("tool.eraser")},
     {id: "shape", tool: shape, label: t("tool.shape")},
-    {id: "text", tool: "text", label: TOOL_LABEL.text},
+    {id: "text", tool: "text", label: t("tool.text")},
     {id: "connector", tool: connector, label: t("tool.connector")},
   ];
   // Number keys 1–6 switch tools directly; don't steal keys while text is being typed or a dialog or menu is open.
@@ -105,7 +105,7 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
             onChange={(color) => editor()?.setStroke({color: color.toString("hex").toLowerCase()})}
           >
             {INKS.map((ink) => (
-              <ColorSwatchPicker.Item key={ink.value} color={ink.value} aria-label={ink.name}>
+              <ColorSwatchPicker.Item key={ink.value} color={ink.value} aria-label={t(ink.name)}>
                 <ColorSwatchPicker.Swatch />
                 <ColorSwatchPicker.Indicator />
               </ColorSwatchPicker.Item>
@@ -126,7 +126,7 @@ export function EditorToolbar({ui, editor, onAi}: Props) {
                 }}
               >
                 {WIDTHS.map((width, index) => (
-                  <ToggleButton key={width.value} id={String(width.value)} isIconOnly aria-label={t("width.line", {name: width.name})}>
+                  <ToggleButton key={width.value} id={String(width.value)} isIconOnly aria-label={t("width.line", {name: t(width.name)})}>
                     {index > 0 && <ToggleButtonGroup.Separator />}
                     <span className="easel-weight" style={{height: width.value + 1}} aria-hidden />
                   </ToggleButton>
@@ -209,7 +209,7 @@ function KindPicker<T extends Tool>({label, value, options, onChange}: {label: s
       }}
     >
       {options.map((tool, index) => (
-        <ToggleButton key={tool} id={tool} isIconOnly aria-label={TOOL_LABEL[tool]}>
+        <ToggleButton key={tool} id={tool} isIconOnly aria-label={t(`tool.${tool}`)}>
           {index > 0 && <ToggleButtonGroup.Separator />}
           {TOOL_ICON[tool]}
         </ToggleButton>

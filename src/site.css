@@ -1,0 +1,71 @@
+@import "./theme/index.css";
+@import "./theme/motion.css";
+@import "./vendor/niltavi-ui/styles/saas.css";
+@import "./vendor/niltavi-ui/styles/kit-sidebar.css";
+
+html, body, #root {
+  min-height: 100%;
+  margin: 0;
+  background: var(--background);
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.niltavi-product-header__inner {
+  padding-top: env(safe-area-inset-top);
+}
+
+.site-intro {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  flex: 1;
+  gap: calc(var(--spacing) * 4);
+  padding-block: calc(var(--spacing) * 24);
+}
+
+.site-intro h1 {
+  font-size: clamp(var(--text-4xl), 7vw, var(--text-6xl));
+  font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+}
+
+.site-intro p {
+  max-width: 42ch;
+  color: var(--muted);
+  font-size: var(--text-lg);
+  text-wrap: pretty;
+}
+
+.site-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+}
+
+.site-auth {
+  width: 100%;
+  max-width: 26rem;
+  margin: auto;
+  padding: calc(var(--spacing) * 8) calc(var(--spacing) * 4);
+  display: grid;
+  justify-items: center;
+}
+
+.site-pending {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: calc(var(--spacing) * 8);
+}

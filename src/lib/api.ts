@@ -1,5 +1,5 @@
 import {locale, t} from "./i18n.ts";
-import type {AiRequest, AuthConfig, AiResponse, ErrorBody, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../../shared/api.ts";
+import type {AdminAccount, AdminGeneral, AdminOverview, AdminSignIn, AdminSignInInput, AiRequest, AuthConfig, AiResponse, ErrorBody, ErrorCode, PushRequest, Quota, RemoteWork, RemoteWorkInfo, User} from "../../shared/api.ts";
 
 export class ApiError extends Error {
   readonly code: ErrorCode | "network" | "aborted";
@@ -54,9 +54,20 @@ export const api = {
   authConfig: () => request<AuthConfig>("GET", "/auth/config"),
   register: (email: string, password: string) => request<{token: string; user: User}>("POST", "/auth/register", {body: {email, password}}),
   login: (email: string, password: string) => request<{token: string; user: User}>("POST", "/auth/login", {body: {email, password}}),
-  requestCode: (email: string) => request<{ok: true}>("POST", "/auth/request", {body: {email}}),
-  verifyCode: (email: string, code: string) => request<{token: string; user: User}>("POST", "/auth/verify", {body: {email, code}}),
   exchangeGrant: (code: string) => request<{token: string; user: User}>("POST", "/auth/grant", {body: {code}}),
+  admin: {
+    overview: (token: string) => request<AdminOverview>("GET", "/admin/overview", {token}),
+    signIn: (token: string) => request<AdminSignIn>("GET", "/admin/sign-in", {token}),
+    saveSignIn: (token: string, body: AdminSignInInput) => request<AdminSignIn>("PUT", "/admin/sign-in", {token, body}),
+    testIdentity: (token: string, issuer?: string) =>
+      request<{ok: true; issuer: string; authorizationEndpoint: string}>("POST", "/admin/sign-in/test", {token, body: issuer ? {issuer} : {}}),
+    accounts: (token: string, query: string) =>
+      request<{accounts: AdminAccount[]}>("GET", `/admin/accounts${query ? `?q=${encodeURIComponent(query)}` : ""}`, {token}),
+    setRole: (token: string, id: string, role: "admin" | "user") =>
+      request<{id: string; role: "admin" | "user"}>("POST", `/admin/accounts/${encodeURIComponent(id)}/role`, {token, body: {role}}),
+    general: (token: string) => request<AdminGeneral>("GET", "/admin/general", {token}),
+    saveGeneral: (token: string, body: Pick<AdminGeneral, "publicOrigin" | "aiDailyQuota">) => request<AdminGeneral>("PUT", "/admin/general", {token, body}),
+  },
   signOut: (token: string) => request<{ok: true}>("POST", "/auth/signout", {token}),
   listWorks: (token: string) => request<{works: RemoteWorkInfo[]}>("GET", "/works", {token}),
   getWork: (token: string, id: string) => request<RemoteWork>("GET", `/works/${id}`, {token}),

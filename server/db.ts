@@ -49,6 +49,17 @@ export function openDatabase(path: string): DatabaseSync {
   if (!columns.has("identity_issuer")) db.exec("ALTER TABLE users ADD COLUMN identity_issuer TEXT");
   if (!columns.has("identity_sid")) db.exec("ALTER TABLE users ADD COLUMN identity_sid TEXT");
   if (!columns.has("name")) db.exec("ALTER TABLE users ADD COLUMN name TEXT");
+  if (!columns.has("role")) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+  // The first account on a server is its administrator, so an existing server always has one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    UPDATE users SET role = 'admin'
+      WHERE id = (SELECT id FROM users ORDER BY created_at, id LIMIT 1)
+        AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');
+  `);
 
   const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {name: string}[]).map((t) => t.name));
   if (!tables.has("auth_grants")) {

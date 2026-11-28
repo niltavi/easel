@@ -1,5 +1,4 @@
 import type {Quota, User} from "../../shared/api.ts";
-import {t} from "./i18n.ts";
 
 /** Canvas content. The concrete structure of elements is interpreted by the canvas engine's adapter layer. */
 export interface Scene {
@@ -55,12 +54,6 @@ export function workStatus(work: WorkMeta): WorkStatus {
   return work.cloud.dirty ? "pending" : "synced";
 }
 
-export const STATUS_LABEL: Record<WorkStatus, string> = {
-  local: t("status.local"),
-  pending: t("status.pending"),
-  synced: t("status.synced"),
-  remote: t("status.remote"),
-};
 
 export type SaveState = "saved" | "saving" | "failed";
 

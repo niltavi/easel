@@ -47,30 +47,32 @@ export interface IdentityUser {
   sid: string | null;
 }
 
-let cachedDiscovery: {data: OidcDiscovery; fetchedAt: number} | null = null;
-let cachedJwks: {keys: JwkRsa[]; fetchedAt: number} | null = null;
+// Keyed by URL: the administrator can change the issuer, so a cache for one issuer must never answer for another.
+const discoveryCache = new Map<string, {data: OidcDiscovery; fetchedAt: number}>();
+const jwksCache = new Map<string, {keys: JwkRsa[]; fetchedAt: number}>();
 
 const DISCOVERY_TTL = 3600_000;
 const JWKS_TTL = 3600_000;
 
-async function discover(issuer: string): Promise<OidcDiscovery> {
-  if (cachedDiscovery && Date.now() - cachedDiscovery.fetchedAt < DISCOVERY_TTL) return cachedDiscovery.data;
-  const response = await fetch(`${issuer}/.well-known/openid-configuration`);
+export async function discover(issuer: string): Promise<OidcDiscovery> {
+  const cached = discoveryCache.get(issuer);
+  if (cached && Date.now() - cached.fetchedAt < DISCOVERY_TTL) return cached.data;
+  const response = await fetch(`${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`, {signal: AbortSignal.timeout(8_000)});
   if (!response.ok) throw new Error(`OIDC discovery failed: ${response.status}`);
   const data = (await response.json()) as OidcDiscovery;
-  if (data.authorization_endpoint && data.token_endpoint && data.jwks_uri) {
-    cachedDiscovery = {data, fetchedAt: Date.now()};
-  }
+  if (!data.authorization_endpoint || !data.token_endpoint || !data.jwks_uri) throw new Error("OIDC discovery document is incomplete");
+  discoveryCache.set(issuer, {data, fetchedAt: Date.now()});
   return data;
 }
 
 async function fetchJwks(jwksUri: string): Promise<JwkRsa[]> {
-  if (cachedJwks && Date.now() - cachedJwks.fetchedAt < JWKS_TTL) return cachedJwks.keys;
+  const cached = jwksCache.get(jwksUri);
+  if (cached && Date.now() - cached.fetchedAt < JWKS_TTL) return cached.keys;
   const response = await fetch(jwksUri);
   if (!response.ok) throw new Error(`JWKS fetch failed: ${response.status}`);
   const data = (await response.json()) as {keys: JwkRsa[]};
   const keys = data.keys.filter((k) => k.kty === "RSA");
-  cachedJwks = {keys, fetchedAt: Date.now()};
+  jwksCache.set(jwksUri, {keys, fetchedAt: Date.now()});
   return keys;
 }
 
@@ -196,5 +198,4 @@ export async function checkSession(
   return (await response.json()) as {active: boolean; orgs?: IdTokenClaims["orgs"]};
 }
 
-export {discover};
 export type {OidcDiscovery, IdTokenClaims};

@@ -7,15 +7,12 @@ import {createClaudeProvider, mockProvider, type AiProvider} from "./ai.ts";
 import {createApp, createIdentityRoutes} from "./app.ts";
 import {openDatabase} from "./db.ts";
 import type {IdentityConfig} from "./identity.ts";
-import {createMailer} from "./mail.ts";
+import {route} from "../src/site/routes.ts";
 
 const env = process.env;
 const port = Number(env.PORT ?? 8787);
 const dbPath = resolve(env.EASEL_DB ?? "data/easel.db");
 mkdirSync(dirname(dbPath), {recursive: true});
-
-const selfHosted = env.EASEL_SELF_HOSTED === "1";
-if (selfHosted) console.log("[easel] self-hosted mode: sign-in uses email and password, and no email is sent");
 
 let identity: IdentityConfig | undefined;
 const origin = env.EASEL_ORIGIN;
@@ -36,10 +33,8 @@ const db = openDatabase(dbPath);
 
 const api = createApp({
   db,
-  mailer: createMailer(env),
   ai,
   dailyQuota: Number(env.EASEL_AI_DAILY_QUOTA ?? 5),
-  selfHosted,
   identity,
   origin,
 });
@@ -54,9 +49,16 @@ server.route("/", api);
 
 // In production the same process serves the built frontend.
 if (existsSync("dist/index.html")) {
-  const index = readFileSync("dist/index.html", "utf8");
+  const home = readFileSync("dist/index.html", "utf8");
+  const chineseHome = readFileSync("dist/zh/index.html", "utf8");
+  const appShell = readFileSync("dist/app/index.html", "utf8");
+  server.get("*", async (c, next) => {
+    const page = route(c.req.path);
+    if (!page) return next();
+    if (page.page === "home") return c.html(page.locale === "zh-CN" ? chineseHome : home);
+    return c.html(page.locale === "zh-CN" ? appShell.replace('<html lang="en">', '<html lang="zh-CN">') : appShell);
+  });
   server.use("*", serveStatic({root: "dist"}));
-  server.get("*", (c) => c.html(index));
 }
 
 serve({fetch: server.fetch, port}, () => console.log(`[easel] server started: http://localhost:${port}`));

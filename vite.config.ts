@@ -2,11 +2,14 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import {defineConfig} from "vitest/config";
 import {VitePWA} from "vite-plugin-pwa";
+import {siteHtml} from "./scripts/site-html.ts";
 
 const apiTarget = process.env.EASEL_API ?? "http://localhost:8787";
 
 export default defineConfig({
+  build: {rollupOptions: {input: ["index.html", "zh/index.html", "app/index.html"]}},
   plugins: [
+    siteHtml(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -18,7 +21,8 @@ export default defineConfig({
         description: "A personal whiteboard that works offline",
         lang: "en",
         display: "standalone",
-        start_url: "/",
+        id: "/",
+        start_url: "/app",
         background_color: "#F5F1E6",
         theme_color: "#F5F1E6",
         icons: [
@@ -32,8 +36,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         globIgnores: ["fonts/Xiaolai/**"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallback: "/app/index.html",
+        navigateFallbackAllowlist: [/^\/(?:zh\/)?app(?:\/|\?|$)/],
         runtimeCaching: [
           {
             urlPattern: ({url}) => url.pathname.startsWith("/fonts/"),

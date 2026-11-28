@@ -29,10 +29,11 @@ AI 可以按描述画流程图，也可以修改画布上已有的流程图。�
 <br />
 
 <div>
+<a href="../en/for-agents.md">For Agents</a>
 <a href="https://niltavi.com/">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/niltavi-logo-dark.svg" />
-  <img align="right" src="../assets/niltavi-logo-light.svg" width="72" height="26" alt="niltavi" />
+  <source media="(prefers-color-scheme: dark)" srcset="../../public/niltavi-logo-dark.svg" />
+  <img align="right" src="../../public/niltavi-logo-light.svg" width="72" height="26" alt="niltavi" />
 </picture>
 </a>
 </div>

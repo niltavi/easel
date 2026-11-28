@@ -36,7 +36,14 @@ function hit(elements: readonly ExcalidrawElement[], x: number, y: number, reach
   for (let index = elements.length - 1; index >= 0; index--) {
     const element = elements[index];
     if (element.id === except || !isConnectable(element)) continue;
-    if (x >= element.x - reach && x <= element.x + element.width + reach && y >= element.y - reach && y <= element.y + element.height + reach) return element;
+    if (x >= element.x - reach && x <= element.x + element.width + reach && y >= element.y - reach && y <= element.y + element.height + reach) {
+      const inside = x >= element.x && x <= element.x + element.width && y >= element.y && y <= element.y + element.height;
+      if (inside) {
+        const distToEdge = Math.min(x - element.x, element.x + element.width - x, y - element.y, element.y + element.height - y);
+        if (distToEdge > reach) continue;
+      }
+      return element;
+    }
   }
   return null;
 }

@@ -1,11 +1,11 @@
 // Sign-in session and cloud sync.
 // The cloud stores a versioned full snapshot per work; the local copy is always the usable one, and a sync failure doesn't affect editing.
-import type {PushConflict, RemoteWorkInfo} from "../../shared/api.ts";
+import type {AuthConfig, PushConflict, RemoteWorkInfo} from "../../shared/api.ts";
 import {api, ApiError} from "./api.ts";
 import * as store from "./db.ts";
 import {EaselFileError, parseDocument, serializeDocument} from "./file.ts";
 import {t} from "./i18n.ts";
-import {editor, getState, notify, setState, ui} from "./state.ts";
+import {canOpenWork, editor, getState, notify, setState, ui} from "./state.ts";
 import type {Session, WorkMeta} from "./types.ts";
 import {ensureCurrent, newId, openLocalWork, pendingDeletes, refreshWorks, setPendingDeletes} from "./works.ts";
 
@@ -29,22 +29,16 @@ function activeSession(): Session | null {
 
 // ---------- Sign-in ----------
 
-export const requestCode = (email: string) => api.requestCode(email);
-
-/** How the server signs people in. An unreachable server is treated as the default, an emailed code. */
-let cachedAuthConfig: {signIn: "code" | "password" | "identity"; signInUrl?: string} | null = null;
-export async function authConfig() {
-  if (cachedAuthConfig) return cachedAuthConfig;
+/** Sign-in methods the server offers now. Read on each sign-in so a change by the admin shows up without a reload. */
+export async function authConfig(): Promise<AuthConfig> {
   try {
-    cachedAuthConfig = await api.authConfig();
+    return await api.authConfig();
   } catch {
-    cachedAuthConfig = {signIn: "code"};
+    // Unreachable server: offer the local method, which is the server's default.
+    return {localLogin: true, identityLogin: false};
   }
-  return cachedAuthConfig;
 }
-export const authMode = () => authConfig().then((c) => c.signIn);
 
-export const verifyCode = async (email: string, code: string) => adopt(await api.verifyCode(email, code));
 export const register = async (email: string, password: string) => adopt(await api.register(email, password));
 export const signInWithPassword = async (email: string, password: string) => adopt(await api.login(email, password));
 
@@ -367,7 +361,7 @@ async function download(session: Session, id: string): Promise<boolean> {
 /** Open a work; download it first if it hasn't been downloaded yet. */
 export async function openWork(id: string): Promise<boolean> {
   const work = getState().works.find((item) => item.id === id);
-  if (!work) return false;
+  if (!work || !canOpenWork(work)) return false;
   if (work.cloud && !work.cloud.downloaded) {
     const session = activeSession();
     if (!session || !getState().online) {
