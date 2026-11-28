@@ -78,6 +78,16 @@ describe("self-hosted sign-in", () => {
     expect((await post(app, "/auth/login", {email: "ada@example.com", password: "correct horse"})).status).toBe(200);
   });
 
+  it("returns a conflict when two requests register the same address at once", async () => {
+    const app = build(true);
+    const first = {email: "ada@example.com", password: "first password"};
+    const second = {email: "ADA@example.com", password: "second password"};
+    const responses = await Promise.all([post(app, "/auth/register", first), post(app, "/auth/register", second)]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const accepted = responses[0].ok ? first : second;
+    expect((await post(app, "/auth/login", accepted)).status).toBe(200);
+  });
+
   it("rejects a wrong password and an unknown account the same way, and locks after repeated failures", async () => {
     const app = build(true);
     await post(app, "/auth/register", {email: "ada@example.com", password: "correct horse"});

@@ -104,8 +104,9 @@ export function createApp({db, mailer, ai, dailyQuota, selfHosted = false, aiTim
     if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) return fail(c, 409, "email_taken", "emailTaken");
     const user: User = {id: randomUUID(), email};
     // Nothing proved that the address belongs to this person, so it is recorded as unverified.
-    db.prepare("INSERT INTO users (id, email, created_at, password_hash, email_verified) VALUES (?, ?, ?, ?, 0)").run(
+    const result = db.prepare("INSERT INTO users (id, email, created_at, password_hash, email_verified) VALUES (?, ?, ?, ?, 0) ON CONFLICT(email) DO NOTHING").run(
       user.id, email, now(), await hashPassword(body.password));
+    if (!result.changes) return fail(c, 409, "email_taken", "emailTaken");
     return startSession(c, user);
   });
 

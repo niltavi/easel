@@ -1,5 +1,3 @@
-import {t} from "../lib/i18n.ts";
-
 export type Tool = "select" | "pen" | "eraser" | "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line";
 
 export const SHAPE_TOOLS = ["rectangle", "ellipse", "diamond"] as const;
@@ -7,34 +5,22 @@ export const CONNECTOR_TOOLS = ["arrow", "line"] as const;
 export type ShapeTool = (typeof SHAPE_TOOLS)[number];
 export type ConnectorTool = (typeof CONNECTOR_TOOLS)[number];
 
-export const TOOL_LABEL: Record<Tool, string> = {
-  select: t("tool.select"),
-  pen: t("tool.pen"),
-  eraser: t("tool.eraser"),
-  rectangle: t("tool.rectangle"),
-  ellipse: t("tool.ellipse"),
-  diamond: t("tool.diamond"),
-  text: t("tool.text"),
-  arrow: t("tool.arrow"),
-  line: t("tool.line"),
-};
-
 // Colours for work content, taken from the Niltavi palette (ink, niltava-600, rufous-600, leaf-600, gold-600, berry-600).
 // They are written into work files, so they are stored as fixed colour values and don't follow the UI theme.
 export const INKS = [
-  {name: t("ink.ink"), value: "#283e38"},
-  {name: t("ink.cobalt"), value: "#3a5cf4"},
-  {name: t("ink.rufous"), value: "#bf4100"},
-  {name: t("ink.leaf"), value: "#00874f"},
-  {name: t("ink.gold"), value: "#9a6400"},
-  {name: t("ink.berry"), value: "#d30033"},
+  {name: "ink.ink", value: "#283e38"},
+  {name: "ink.cobalt", value: "#3a5cf4"},
+  {name: "ink.rufous", value: "#bf4100"},
+  {name: "ink.leaf", value: "#00874f"},
+  {name: "ink.gold", value: "#9a6400"},
+  {name: "ink.berry", value: "#d30033"},
 ] as const;
 export const DEFAULT_INK = INKS[0].value;
 
 export const WIDTHS = [
-  {name: t("width.thin"), value: 1},
-  {name: t("width.medium"), value: 2},
-  {name: t("width.thick"), value: 4},
+  {name: "width.thin", value: 1},
+  {name: "width.medium", value: 2},
+  {name: "width.thick", value: 4},
 ] as const;
 
 export type WidthLevel = (typeof WIDTHS)[number]["value"];

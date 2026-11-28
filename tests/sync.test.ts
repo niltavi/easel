@@ -6,7 +6,7 @@ import {createApp} from "../server/app.ts";
 import {openDatabase} from "../server/db.ts";
 import * as store from "../src/lib/db.ts";
 import {parseDocument, serializeDocument} from "../src/lib/file.ts";
-import {getState, onNotice, resetStateForTests, setState, visibleWorks, type Notice} from "../src/lib/state.ts";
+import {currentWork, getState, onNotice, resetStateForTests, setState, visibleWorks, type Notice} from "../src/lib/state.ts";
 import {disableSync, enableSync, openWork, signOut, syncNow, verifyCode} from "../src/lib/sync.ts";
 import {workStatus, type Scene} from "../src/lib/types.ts";
 import {createWork, loadWorkspace, removeWork, saveScene} from "../src/lib/works.ts";
@@ -264,6 +264,8 @@ describe("cloud sync", () => {
 
     expect(visibleWorks().map((w) => w.id)).toEqual([localId]);
     expect(getState().currentId).toBe(localId);
+    expect(currentWork({...getState(), currentId: syncedId})).toBeNull();
+    expect(await openWork(syncedId)).toBe(false);
 
     clock += 61_000;
     await signIn("b@example.com");

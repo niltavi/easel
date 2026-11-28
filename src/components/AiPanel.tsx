@@ -18,7 +18,7 @@ interface Props {
   onClose: () => void;
 }
 
-const SUGGESTIONS = [t("ai.suggestDraw"), t("ai.suggestBranch"), t("ai.suggestStep")];
+const SUGGESTIONS = ["ai.suggestDraw", "ai.suggestBranch", "ai.suggestStep"] as const;
 
 /** When the quota resets: the local time, and whether that is tomorrow. */
 function resetTime(quota: Quota): {time: string; tomorrow: boolean} {
@@ -104,8 +104,8 @@ function AiForm({isOpen, isMobile, pending, error, quota, objectCount, onSubmit,
       {!text && !blocked && (
         <div className="flex flex-wrap gap-1.5">
           {SUGGESTIONS.slice(objectCount > 0 ? 1 : 0, objectCount > 0 ? 3 : 1).map((suggestion) => (
-            <Button key={suggestion} size="sm" variant="tertiary" className="h-auto min-h-8 max-w-full py-1.5 text-start whitespace-normal" onPress={() => setPrompt(suggestion)}>
-              {suggestion}
+            <Button key={suggestion} size="sm" variant="tertiary" className="h-auto min-h-8 max-w-full py-1.5 text-start whitespace-normal" onPress={() => setPrompt(t(suggestion))}>
+              {t(suggestion)}
             </Button>
           ))}
         </div>
