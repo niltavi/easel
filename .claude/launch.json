@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "easel-api",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORT=8797", "EASEL_AI_MOCK=1", "EASEL_DB=data/verify.db", "node", "server/index.ts"],
+      "port": 8797
+    },
+    {
+      "name": "easel-web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["EASEL_API=http://localhost:8797", "pnpm", "exec", "vite", "--port", "5183", "--strictPort"],
+      "port": 5183
+    }
+  ]
+}
