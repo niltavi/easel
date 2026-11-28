@@ -1,8 +1,9 @@
-import {BarsDescendingAlignLeft, ArrowRightFromSquare, Cloud, CloudArrowUpIn, CloudCheck, Display, Ellipsis, FileArrowUp, Person, Plus} from "@gravity-ui/icons";
-import {Button, Dropdown, Label, SearchField, Separator} from "@heroui/react";
+import {BarsDescendingAlignLeft, Cloud, CloudArrowUpIn, CloudCheck, CloudSlash, Display, Ellipsis, FileArrowUp, Plus} from "@gravity-ui/icons";
+import {Button, Dropdown, Label, SearchField, Separator, Tooltip} from "@heroui/react";
 import {useMemo, useState, type ReactNode} from "react";
 import {locale, t, type MessageKey} from "../lib/i18n.ts";
 import {workStatus, type Session, type WorkMeta, type WorkStatus} from "../lib/types.ts";
+import {AccountMenu} from "./AccountMenu.tsx";
 
 export type WorkAction = "rename" | "duplicate" | "sync-on" | "sync-off" | "export" | "delete";
 
@@ -197,29 +198,21 @@ export function WorkList({works, currentId, session, onOpen, onAction, onNew, on
       </nav>
       <Separator />
       <div className="easel-works__account">
-        {session ? (
-          <>
-            <Person aria-hidden className="easel-works__avatar" />
-            <div className="easel-works__who">
-              <span className="easel-works__email">{session.user.email}</span>
-              {session.expired && <span className="easel-works__hint">{t("session.expired")}</span>}
-            </div>
-            {session.expired && (
-              <Button size="sm" variant="secondary" onPress={onSignIn}>
-                {t("common.signInAgain")}
+        <div className="easel-account__row">
+          <AccountMenu session={session} onSignIn={onSignIn} onSignOut={onSignOut} />
+          {!session && (
+            <Tooltip delay={300}>
+              <Button isIconOnly size="sm" variant="ghost" className="easel-account__local" aria-label={t("works.guestHint")}>
+                <CloudSlash aria-hidden />
               </Button>
-            )}
-            <Button isIconOnly size="sm" variant="ghost" aria-label={t("common.signOut")} onPress={onSignOut}>
-              <ArrowRightFromSquare aria-hidden />
-            </Button>
-          </>
-        ) : (
-          <>
-            <p className="easel-works__hint">{t("works.guestHint")}</p>
-            <Button size="sm" variant="secondary" onPress={onSignIn}>
-              {t("common.signIn")}
-            </Button>
-          </>
+              <Tooltip.Content placement="top end">{t("works.guestHint")}</Tooltip.Content>
+            </Tooltip>
+          )}
+        </div>
+        {session?.expired && (
+          <Button size="sm" variant="secondary" onPress={onSignIn}>
+            {t("common.signInAgain")}
+          </Button>
         )}
       </div>
     </div>

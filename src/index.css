@@ -143,34 +143,62 @@
 
   .easel-works__account {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: calc(var(--spacing) * 2);
-    padding-inline-start: calc(var(--spacing) * 2);
   }
 
-  .easel-works__avatar {
+  .easel-works__hint {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+
+  .easel-account__row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+  }
+
+  .easel-account__local {
     flex-shrink: 0;
     color: var(--muted);
   }
 
-  .easel-works__who {
+  .easel-account__trigger {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-start;
+    width: auto;
+    height: auto;
+    padding: calc(var(--spacing) * 2);
+    /* Same corner radius as the account menu popover, so the open button and its menu read as one shape. */
+    border-radius: min(32px, calc(var(--radius-2xl) + var(--spacing) * 1.5));
+    text-align: start;
+  }
+
+  .easel-account__avatar {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: calc(var(--spacing) * 8);
+    height: calc(var(--spacing) * 8);
+    border-radius: 999px;
+    background: var(--default);
+    color: var(--muted);
+  }
+
+  .easel-account__who {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
   }
 
-  .easel-works__email {
+  .easel-account__name {
     overflow: hidden;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .easel-works__hint {
-    flex: 1;
-    color: var(--muted);
-    font-size: var(--text-xs);
-    line-height: 1.5;
   }
 
   .easel-drawer {
@@ -194,6 +222,8 @@
     min-height: calc(var(--spacing) * 12);
     padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2);
     border-block-end: var(--border-width) solid var(--separator);
+    /* The top bar is now the first thing on the page, so it keeps clear of the notch on its own. */
+    padding-block-start: max(calc(var(--spacing) * 1.5), env(safe-area-inset-top));
   }
 
   .easel-name {

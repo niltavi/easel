@@ -138,7 +138,8 @@ export function Root() {
 
   return (
     <>
-      <Header url={url} />
+      {/* The drawing page has its own top bar; brand, theme, language and GitHub live in the account menu. */}
+      {page !== "app" && <Header url={url} />}
       {page === "home" ? <Home locale={locale} />
         : page === "app" && App ? <App locale={locale} />
         : page === "admin" && AdminPage ? <AdminPage locale={locale} path={url.pathname} />
